@@ -2,23 +2,39 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
   <title>Hot Seat Football — QB / Receiver Spinner</title>
 
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
+    html, body { height: 100%; }
+
     body{
-      width:100vw;height:100vh;
-      display:flex;justify-content:center;align-items:center;
-      background:#000;overflow:hidden;color:#fff;
+      width:100vw;
+      min-height:100vh;     /* fallback */
+      min-height:100dvh;    /* modern */
+      min-height:100svh;    /* iOS fix */
+      display:flex;
+      justify-content:center;
+      align-items:center;
+      background:#000;
+      overflow:hidden;
+      color:#fff;
       font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
     }
 
     .stage{
-      position:relative;width:100vw;height:100vh;
-      display:flex;justify-content:center;align-items:center;
+      position:relative;
+      width:100vw;
+      height:100vh;         /* fallback */
+      height:100dvh;
+      height:100svh;
+      display:flex;
+      justify-content:center;
+      align-items:center;
       background:#000;
+      padding-bottom: env(safe-area-inset-bottom);
     }
 
     /* Image (NO STRETCH — iPhone-style contain) */
@@ -73,54 +89,49 @@
     .bottomPill{
       position:absolute;
       left:50%;
-      bottom:calc(108px + env(safe-area-inset-bottom)); /* above buttons + iPhone safe area */
       transform:translateX(-50%);
+      bottom: calc(92px + env(safe-area-inset-bottom)); /* above buttons */
       z-index:80;
 
       background:rgba(0,0,0,0.75);
       backdrop-filter: blur(10px);
-      padding:14px 16px;
+      padding:12px 14px;
       border-radius:999px;
       font-weight:900;
-      letter-spacing:0.12em;
+      letter-spacing:0.10em;
       text-transform:uppercase;
       box-shadow:0 18px 60px rgba(0,0,0,0.7);
       color:#fff;
 
-      width:min(92vw, 720px);   /* responsive width */
-      max-width:92vw;
+      width:min(94vw, 720px);
+      max-width:94vw;
       text-align:center;
 
       white-space:normal;       /* allow wrap */
       overflow-wrap:anywhere;   /* prevent cutoff */
-      line-height:1.25;
+      line-height:1.2;
     }
     .bottomPill .gold{ color:#facc15; }
 
     /* Controls (two buttons only) — MOBILE SAFE */
     .controls{
       position:absolute;
-      bottom:calc(18px + env(safe-area-inset-bottom));
       left:50%;
       transform:translateX(-50%);
+      bottom: calc(14px + env(safe-area-inset-bottom));
       display:flex;
-      gap:12px;
+      gap:10px;
       z-index:90;
 
-      width:min(92vw, 520px);   /* fit phones */
+      width:min(94vw, 520px);
       justify-content:center;
       pointer-events:auto;
-      flex-wrap:wrap;           /* allow wrap if needed */
+      flex-wrap:wrap;
     }
 
     button{
       appearance:none;border:none;cursor:pointer;
       border-radius:999px;
-
-      padding:18px 20px;
-      font-weight:900;
-      letter-spacing:0.12em;
-      text-transform:uppercase;
 
       background:rgba(255,255,255,0.18);
       color:#fff;
@@ -128,10 +139,15 @@
       box-shadow:0 18px 60px rgba(0,0,0,0.7);
       transition:transform 0.15s ease, background 0.15s ease, opacity 0.15s ease;
 
-      flex: 1 1 160px;          /* responsive */
-      min-width: 140px;         /* smaller than 220px so it won’t truncate */
+      flex: 1 1 160px;
+      min-width: 140px;
       max-width: 260px;
 
+      padding: 16px 16px;
+      font-weight:900;
+      letter-spacing:0.10em;
+      text-transform:uppercase;
+      font-size:13px;
       white-space:nowrap;
     }
     button:hover{ transform:translateY(-1px); background:rgba(255,255,255,0.24); }
@@ -142,7 +158,7 @@
       pointer-events:none;
     }
 
-    /* Your existing “fancy” touchdown flash (kept) */
+    /* Fancy touchdown flash (kept) */
     .flash {
       position:absolute;
       inset:0;
@@ -164,7 +180,7 @@
       100% { opacity:0; }
     }
 
-    /* ===== ULTRA-RELIABLE FULL-SCREEN WHITE FLASH (always visible) ===== */
+    /* Ultra-visible full-screen flash overlay */
     #tdFlash{
       position: fixed;
       inset: 0;
@@ -189,8 +205,15 @@
     /* Extra-tight phones */
     @media (max-width: 420px){
       .spinLabel{ font-size:12px; padding:14px 18px; }
-      .bottomPill{ font-size:12px; letter-spacing:0.10em; padding:12px 12px; }
-      button{ padding:14px 14px; font-size:12px; letter-spacing:0.10em; min-width:130px; }
+      .bottomPill{ font-size:12px; letter-spacing:0.08em; padding:10px 10px; }
+      button{ padding:14px 12px; font-size:12px; letter-spacing:0.08em; min-width:130px; }
+    }
+
+    /* Short screens (iPhone landscape / small height) */
+    @media (max-height: 740px){
+      .bottomPill{ bottom: calc(84px + env(safe-area-inset-bottom)); }
+      button{ padding: 14px 14px; font-size: 12px; }
+      .spinLabel{ font-size: 12px; padding: 14px 18px; }
     }
   </style>
 </head>
@@ -218,9 +241,9 @@
 
   <script>
     // ========= SETTINGS (edit here) =========
-    const SPIN_SPEED_MS = 90;       // how fast images change during spin
-    const QB_SPIN_MS = 2400;        // spin duration after QB PASS click
-    const RECEIVER_SPIN_MS = 2400;  // spin duration after RECEIVER click
+    const SPIN_SPEED_MS = 90;
+    const QB_SPIN_MS = 2400;
+    const RECEIVER_SPIN_MS = 2400;
     // =======================================
 
     const img = document.getElementById("image");
@@ -255,11 +278,9 @@
     async function getRandomImage(type){
       return await fetchJSON(`/api/random-image?type=${encodeURIComponent(type)}`);
     }
-
     async function getRandomPlayer(){
       return await fetchJSON(`/api/random-player`);
     }
-
     async function getRandomCatch(){
       return await fetchJSON(`/api/random-catch`);
     }
@@ -269,7 +290,6 @@
       void flash.offsetWidth;
       flash.classList.add("play");
     }
-
     function triggerTouchdownFlash(){
       tdFlash.classList.remove("flash");
       void tdFlash.offsetWidth;
@@ -289,7 +309,6 @@
       setButtonsDisabled(true);
 
       img.style.display = "block";
-
       spinLabel.textContent = (type === "QB") ? "QB PASSING…" : "CATCHING…";
       spinLabel.style.display = "block";
 
