@@ -1,112 +1,77 @@
+// ===============================
+// REQUIRED IMPORTS
+// ===============================
 const express = require("express");
 const path = require("path");
 const fs = require("fs");
+const csv = require("csv-parser"); // ✅ FIXES csv is not defined
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Serve your front-end + images
+// ===============================
+// STATIC FILES
+// ===============================
 app.use(express.static(path.join(__dirname, "public")));
 
-// -----------------------------
-// HELPERS
-// -----------------------------
-function firstExistingPath(...paths) {
-  for (const p of paths) {
-    if (fs.existsSync(p)) return p;
-  }
-  return null;
-}
-
-// Normalize keys: trim + lower + remove BOM
-function normalizeKey(k) {
-  return String(k || "")
-    .replace(/^\uFEFF/, "") // BOM
-    .trim()
-    .toLowerCase();
-}
-
-function pickValueFromRow(row, preferredKey) {
-  if (!row || typeof row !== "object") return undefined;
-
-  // Build normalized map
-  const entries = Object.entries(row).map(([k, v]) => [normalizeKey(k), v]);
-  const map = Object.fromEntries(entries);
-
-  // 1) preferred key
-  if (preferredKey && map[preferredKey]) return String(map[preferredKey]).trim();
-
-  // 2) first non-empty cell
-  for (const [, v] of entries) {
-    const val = String(v ?? "").trim();
-    if (val) return val;
-  }
-  return undefined;
-}
-
-function getRandomFromCSV(filePath, preferredKeyLower) {
+// ===============================
+// HELPER: READ CSV FILE
+// ===============================
+function readCsv(filePath) {
   return new Promise((resolve, reject) => {
     const rows = [];
 
     fs.createReadStream(filePath)
-      .pipe(
-        csv({
-          mapHeaders: ({ header }) => normalizeKey(header),
-          skipLines: 0,
-        })
-      )
+      .on("error", reject)
+      .pipe(csv())
       .on("data", (row) => rows.push(row))
-      .on("end", () => {
-        if (!rows.length) return reject(new Error("CSV empty"));
-
-        // Try a few times to avoid picking an empty row
-        for (let i = 0; i < 10; i++) {
-          const pick = rows[Math.floor(Math.random() * rows.length)];
-          const val = pickValueFromRow(pick, preferredKeyLower);
-          if (val) return resolve(val);
-        }
-
-        reject(new Error("No usable value found in CSV"));
-      })
-      .on("error", (err) => reject(err));
+      .on("end", () => resolve(rows))
+      .on("error", reject);
   });
 }
 
-function getRandomImageFromFolder(folder, subFolder) {
-  const files = fs
-    .readdirSync(folder)
-    .filter((f) => /\.(png|jpg|jpeg|webp)$/i.test(f));
-
-  if (!files.length) throw new Error("No images found");
-
-  const pick = files[Math.floor(Math.random() * files.length)];
-  return `/images/${subFolder}/${pick}`;
+function getFirstValue(row) {
+  if (!row) return null;
+  const key = Object.keys(row)[0];
+  return row[key] ? String(row[key]).trim() : null;
 }
 
-// -----------------------------
-// API: RANDOM SINGLE IMAGE
-// -----------------------------
+// ===============================
+// RANDOM IMAGE (SINGLE)
+// ===============================
 app.get("/api/random-image", (req, res) => {
+  const type = (req.query.type || "QB").toLowerCase();
+
+  const folder =
+    type === "receiver"
+      ? path.join(__dirname, "public", "images", "Receiver")
+      : path.join(__dirname, "public", "images", "QB");
+
+  let files;
   try {
-    const type = (req.query.type || "QB").toLowerCase();
-
-    const folder =
-      type === "receiver"
-        ? path.join(__dirname, "public", "images", "Receiver")
-        : path.join(__dirname, "public", "images", "QB");
-
-    const sub = type === "receiver" ? "Receiver" : "QB";
-
-    const url = getRandomImageFromFolder(folder, sub);
-    res.json({ url });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
+    files = fs
+      .readdirSync(folder)
+      .filter((f) => /\.(png|jpg|jpeg|webp)$/i.test(f));
+  } catch (err) {
+    return res.status(500).json({
+      error: "Folder not found",
+      folder
+    });
   }
+
+  if (!files.length) {
+    return res.status(500).json({ error: "No images found" });
+  }
+
+  const pick = files[Math.floor(Math.random() * files.length)];
+  res.json({
+    url: `/images/${type === "receiver" ? "Receiver" : "QB"}/${pick}`
+  });
 });
 
-// -----------------------------
-// API: RANDOM IMAGE BATCH (FAST SPIN)
-// -----------------------------
+// ===============================
+// RANDOM IMAGE BATCH (CASINO SPIN)
+// ===============================
 app.get("/api/random-image-batch", (req, res) => {
   const type = (req.query.type || "QB").toLowerCase();
   const n = Math.min(parseInt(req.query.n || "60", 10), 200);
@@ -116,16 +81,21 @@ app.get("/api/random-image-batch", (req, res) => {
       ? path.join(__dirname, "public", "images", "Receiver")
       : path.join(__dirname, "public", "images", "QB");
 
-  let files = [];
+  let files;
   try {
     files = fs
       .readdirSync(folder)
       .filter((f) => /\.(png|jpg|jpeg|webp)$/i.test(f));
-  } catch (e) {
-    return res.status(500).json({ error: "Folder not found", folder });
+  } catch (err) {
+    return res.status(500).json({
+      error: "Folder not found",
+      folder
+    });
   }
 
-  if (!files.length) return res.status(500).json({ error: "No images found" });
+  if (!files.length) {
+    return res.status(500).json({ error: "No images found" });
+  }
 
   const urls = Array.from({ length: n }, () => {
     const pick = files[Math.floor(Math.random() * files.length)];
@@ -135,54 +105,82 @@ app.get("/api/random-image-batch", (req, res) => {
   res.json({ urls });
 });
 
-// -----------------------------
-// API: RANDOM PLAYER (QB PASS)
-// players.csv can have column "name" OR any single column
-// -----------------------------
+// ===============================
+// RANDOM PLAYER (players.csv)
+// ===============================
 app.get("/api/random-player", async (req, res) => {
   try {
-    const playersPath = firstExistingPath(
-      path.join(__dirname, "players.csv"),
-      path.join(__dirname, "Players.csv")
-    );
-    if (!playersPath) return res.status(500).json({ error: "players.csv not found" });
+    const filePath = path.join(__dirname, "players.csv");
+    const rows = await readCsv(filePath);
 
-    const name = await getRandomFromCSV(playersPath, "name");
+    if (!rows.length) {
+      return res.status(500).json({ error: "players.csv is empty" });
+    }
+
+    const row = rows[Math.floor(Math.random() * rows.length)];
+    const name =
+      row.name ||
+      row.player ||
+      row.Player ||
+      row.Name ||
+      getFirstValue(row);
+
+    if (!name) {
+      return res.status(500).json({
+        error: "No valid player name found",
+        sample: row
+      });
+    }
+
     res.json({ name });
-  } catch (e) {
-    res.status(500).json({ error: "Failed to read players.csv", details: String(e.message || e) });
+  } catch (err) {
+    res.status(500).json({
+      error: "Failed to read players.csv",
+      details: err.message
+    });
   }
 });
 
-// -----------------------------
-// API: RANDOM CATCH (RECEIVER)
-// Receiver.csv can have column "catch" OR any single column
-// -----------------------------
+// ===============================
+// RANDOM CATCH (Receiver.csv)
+// ===============================
 app.get("/api/random-catch", async (req, res) => {
   try {
-    const receiverPath = firstExistingPath(
-      path.join(__dirname, "Receiver.csv"),
-      path.join(__dirname, "receiver.csv")
-    );
-    if (!receiverPath) return res.status(500).json({ error: "Receiver.csv not found" });
+    const filePath = path.join(__dirname, "Receiver.csv");
+    const rows = await readCsv(filePath);
 
-    const result = await getRandomFromCSV(receiverPath, "catch");
-    res.json({ catch: result });
-  } catch (e) {
-    res.status(500).json({ error: "Failed to read Receiver.csv", details: String(e.message || e) });
+    if (!rows.length) {
+      return res.status(500).json({ error: "Receiver.csv is empty" });
+    }
+
+    const row = rows[Math.floor(Math.random() * rows.length)];
+    const catchText =
+      row.catch ||
+      row.result ||
+      row.play ||
+      row.Catch ||
+      row.Result ||
+      getFirstValue(row);
+
+    if (!catchText) {
+      return res.status(500).json({
+        error: "No valid catch text found",
+        sample: row
+      });
+    }
+
+    res.json({ catch: catchText });
+  } catch (err) {
+    res.status(500).json({
+      error: "Failed to read Receiver.csv",
+      details: err.message
+    });
   }
 });
 
-// -----------------------------
-// FALLBACK (HTML)
-// -----------------------------
-app.get("*", (req, res) => {
-  res.sendFile(path.join(__dirname, "public", "index.html"));
-});
-
-// -----------------------------
+// ===============================
 // START SERVER
-// -----------------------------
+// ===============================
 app.listen(PORT, () => {
-  console.log(`Server running: http://localhost:${PORT}`);
+  console.log(`✅ Server running at http://localhost:${PORT}`);
 });
