@@ -10,7 +10,8 @@
     "dev": "node server.js"
   },
   "dependencies": {
-    "csv-parser": "^3.0.0",
-    "express": "^4.19.2"
+    "csv-parser": "^3.2.0",
+    "express": "^4.19.2",
+    "node-fetch": "^2.7.0"
   }
 }

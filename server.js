@@ -1,44 +1,29 @@
-// ===============================
-// REQUIRED IMPORTS
-// ===============================
 const express = require("express");
 const path = require("path");
 const fs = require("fs");
-const csv = require("csv-parser"); // ✅ FIXES csv is not defined
+const fetch = require("node-fetch");
+const csv = require("csv-parser");
+const { Readable } = require("stream");
 
 const app = express();
-const PORT = process.env.PORT || 3000;
 
-// ===============================
-// STATIC FILES
-// ===============================
+/* =========================
+   🔧 EDIT THESE TWO URLS
+   ========================= */
+const PLAYERS_SHEET_URL =
+  "https://docs.google.com/spreadsheets/d/e/2PACX-1vRIMCJ5p9eKQVDF6JJDQtmVReVKAfBCONhJREqwIbZhGCQhXWzS_mgsvj5R1aKVSPijcQnwHZp5Ou9h/pub?gid=0&single=true&output=csv";
+
+const RECEIVERS_SHEET_URL =
+  "https://docs.google.com/spreadsheets/d/e/2PACX-1vTtu7v4mJGbM04kyQMYKWp2Lm5utgZV9nPF8oqRUU23vLTW6NFGGLohOC7RW126eX59snf0aHEBlOcp/pub?gid=0&single=true&output=csv";
+
+/* =========================
+   Static files
+   ========================= */
 app.use(express.static(path.join(__dirname, "public")));
 
-// ===============================
-// HELPER: READ CSV FILE
-// ===============================
-function readCsv(filePath) {
-  return new Promise((resolve, reject) => {
-    const rows = [];
-
-    fs.createReadStream(filePath)
-      .on("error", reject)
-      .pipe(csv())
-      .on("data", (row) => rows.push(row))
-      .on("end", () => resolve(rows))
-      .on("error", reject);
-  });
-}
-
-function getFirstValue(row) {
-  if (!row) return null;
-  const key = Object.keys(row)[0];
-  return row[key] ? String(row[key]).trim() : null;
-}
-
-// ===============================
-// RANDOM IMAGE (SINGLE)
-// ===============================
+/* =========================
+   Random Image (UNCHANGED)
+   ========================= */
 app.get("/api/random-image", (req, res) => {
   const type = (req.query.type || "QB").toLowerCase();
 
@@ -49,19 +34,15 @@ app.get("/api/random-image", (req, res) => {
 
   let files;
   try {
-    files = fs
-      .readdirSync(folder)
-      .filter((f) => /\.(png|jpg|jpeg|webp)$/i.test(f));
-  } catch (err) {
-    return res.status(500).json({
-      error: "Folder not found",
-      folder
-    });
+    files = fs.readdirSync(folder).filter(f =>
+      /\.(png|jpg|jpeg|webp)$/i.test(f)
+    );
+  } catch {
+    return res.status(500).json({ error: "Image folder not found" });
   }
 
-  if (!files.length) {
+  if (!files.length)
     return res.status(500).json({ error: "No images found" });
-  }
 
   const pick = files[Math.floor(Math.random() * files.length)];
   res.json({
@@ -69,118 +50,78 @@ app.get("/api/random-image", (req, res) => {
   });
 });
 
-// ===============================
-// RANDOM IMAGE BATCH (CASINO SPIN)
-// ===============================
-app.get("/api/random-image-batch", (req, res) => {
-  const type = (req.query.type || "QB").toLowerCase();
-  const n = Math.min(parseInt(req.query.n || "60", 10), 200);
+/* =========================
+   CSV helper
+   ========================= */
+async function readCSV(url, column) {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error("Failed to fetch CSV");
 
-  const folder =
-    type === "receiver"
-      ? path.join(__dirname, "public", "images", "Receiver")
-      : path.join(__dirname, "public", "images", "QB");
+  const text = await res.text();
+  const values = [];
 
-  let files;
-  try {
-    files = fs
-      .readdirSync(folder)
-      .filter((f) => /\.(png|jpg|jpeg|webp)$/i.test(f));
-  } catch (err) {
-    return res.status(500).json({
-      error: "Folder not found",
-      folder
-    });
-  }
-
-  if (!files.length) {
-    return res.status(500).json({ error: "No images found" });
-  }
-
-  const urls = Array.from({ length: n }, () => {
-    const pick = files[Math.floor(Math.random() * files.length)];
-    return `/images/${type === "receiver" ? "Receiver" : "QB"}/${pick}`;
+  return new Promise((resolve, reject) => {
+    Readable.from(text)
+      .pipe(csv())
+      .on("data", row => {
+        if (row[column]) values.push(String(row[column]).trim());
+      })
+      .on("end", () => resolve(values))
+      .on("error", reject);
   });
+}
 
-  res.json({ urls });
-});
-
-// ===============================
-// RANDOM PLAYER (players.csv)
-// ===============================
+/* =========================
+   Random Player (QB PASS)
+   ========================= */
 app.get("/api/random-player", async (req, res) => {
   try {
-    const filePath = path.join(__dirname, "players.csv");
-    const rows = await readCsv(filePath);
+    const players = await readCSV(PLAYERS_SHEET_URL, "name");
+    if (!players.length)
+      return res.status(500).json({ error: "No players found" });
 
-    if (!rows.length) {
-      return res.status(500).json({ error: "players.csv is empty" });
-    }
-
-    const row = rows[Math.floor(Math.random() * rows.length)];
-    const name =
-      row.name ||
-      row.player ||
-      row.Player ||
-      row.Name ||
-      getFirstValue(row);
-
-    if (!name) {
-      return res.status(500).json({
-        error: "No valid player name found",
-        sample: row
-      });
-    }
-
-    res.json({ name });
+    res.json({
+      name: players[Math.floor(Math.random() * players.length)]
+    });
   } catch (err) {
     res.status(500).json({
-      error: "Failed to read players.csv",
+      error: "Failed to read players sheet",
       details: err.message
     });
   }
 });
 
-// ===============================
-// RANDOM CATCH (Receiver.csv)
-// ===============================
+/* =========================
+   Random Receiver Catch
+   ========================= */
 app.get("/api/random-catch", async (req, res) => {
   try {
-    const filePath = path.join(__dirname, "Receiver.csv");
-    const rows = await readCsv(filePath);
+    const catches = await readCSV(RECEIVERS_SHEET_URL, "catch");
+    if (!catches.length)
+      return res.status(500).json({ error: "No catches found" });
 
-    if (!rows.length) {
-      return res.status(500).json({ error: "Receiver.csv is empty" });
-    }
-
-    const row = rows[Math.floor(Math.random() * rows.length)];
-    const catchText =
-      row.catch ||
-      row.result ||
-      row.play ||
-      row.Catch ||
-      row.Result ||
-      getFirstValue(row);
-
-    if (!catchText) {
-      return res.status(500).json({
-        error: "No valid catch text found",
-        sample: row
-      });
-    }
-
-    res.json({ catch: catchText });
+    res.json({
+      catch: catches[Math.floor(Math.random() * catches.length)]
+    });
   } catch (err) {
     res.status(500).json({
-      error: "Failed to read Receiver.csv",
+      error: "Failed to read receivers sheet",
       details: err.message
     });
   }
 });
 
-// ===============================
-// START SERVER
-// ===============================
-app.listen(PORT, () => {
-  console.log(`✅ Server running at http://localhost:${PORT}`);
+/* =========================
+   Health check
+   ========================= */
+app.get("/api/health", (_, res) => {
+  res.json({ ok: true });
 });
+
+/* =========================
+   Start server
+   ========================= */
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () =>
+  console.log(`Server running on http://localhost:${PORT}`)
+);
