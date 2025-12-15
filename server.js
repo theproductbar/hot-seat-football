@@ -1,20 +1,11 @@
 const express = require("express");
-<<<<<<< HEAD
-const fs = require("fs");
-const path = require("path");
-const csv = require("csv-parser");
-=======
 const path = require("path");
 const fs = require("fs");
->>>>>>> 8c5791d (Add files via upload)
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-<<<<<<< HEAD
-// -----------------------------
-// STATIC FILES
-// -----------------------------
+// Serve your front-end + images
 app.use(express.static(path.join(__dirname, "public")));
 
 // -----------------------------
@@ -193,111 +184,5 @@ app.get("*", (req, res) => {
 // START SERVER
 // -----------------------------
 app.listen(PORT, () => {
-  console.log(`✅ Server running on port ${PORT}`);
-=======
-// Serve your front-end + images
-app.use(express.static(path.join(__dirname, "public")));
-
-// ---------- CSV helpers ----------
-function loadCsvLines(filePath) {
-  if (!fs.existsSync(filePath)) return [];
-
-  const raw = fs.readFileSync(filePath, "utf8");
-
-  // split lines, trim, remove empties
-  let lines = raw
-    .split(/\r?\n/)
-    .map(l => l.trim())
-    .filter(Boolean);
-
-  if (lines.length === 0) return [];
-
-  // If first line looks like a header (contains letters and not a "real" value), drop it.
-  // Example header: "name" or "player"
-  const first = lines[0].toLowerCase();
-  if (first.includes("name") || first.includes("player") || first.includes("catch")) {
-    lines = lines.slice(1);
-  }
-
-  // If CSV has commas, take first column only
-  lines = lines.map(l => l.split(",")[0].trim()).filter(Boolean);
-
-  return lines;
-}
-
-function pickRandom(arr) {
-  if (!arr || arr.length === 0) return null;
-  return arr[Math.floor(Math.random() * arr.length)];
-}
-
-// IMPORTANT: these match your filenames EXACTLY
-const PLAYERS_CSV_PATH = path.join(__dirname, "players.csv");
-const RECEIVER_CSV_PATH = path.join(__dirname, "Receiver.csv");
-
-// Load once at startup (simple + fast)
-let playersList = loadCsvLines(PLAYERS_CSV_PATH);
-let catchesList = loadCsvLines(RECEIVER_CSV_PATH);
-
-// Health check (super useful)
-app.get("/api/health", (req, res) => {
-  res.json({
-    ok: true,
-    playersCount: playersList.length,
-    catchesCount: catchesList.length,
-    playersFile: fs.existsSync(PLAYERS_CSV_PATH),
-    receiverFile: fs.existsSync(RECEIVER_CSV_PATH),
-  });
-});
-
-// Random player
-app.get("/api/random-player", (req, res) => {
-  // Reload on each call (optional) so you can edit CSV without restarting:
-  playersList = loadCsvLines(PLAYERS_CSV_PATH);
-
-  const name = pickRandom(playersList);
-  if (!name) return res.status(500).json({ error: "No players found in players.csv" });
-
-  res.json({ name });
-});
-
-// Random catch
-app.get("/api/random-catch", (req, res) => {
-  // Reload on each call (optional) so you can edit CSV without restarting:
-  catchesList = loadCsvLines(RECEIVER_CSV_PATH);
-
-  const c = pickRandom(catchesList);
-  if (!c) return res.status(500).json({ error: "No catches found in Receiver.csv" });
-
-  res.json({ catch: c });
-});
-
-// Random image (QB or Receiver)
-app.get("/api/random-image", (req, res) => {
-  const type = (req.query.type || "QB").toString();
-
-  const folder =
-    type.toLowerCase() === "receiver"
-      ? path.join(__dirname, "public", "images", "Receiver")
-      : path.join(__dirname, "public", "images", "QB");
-
-  if (!fs.existsSync(folder)) {
-    return res.status(500).json({ error: `Folder not found: ${folder}` });
-  }
-
-  const files = fs
-    .readdirSync(folder)
-    .filter(f => /\.(png|jpg|jpeg|webp)$/i.test(f));
-
-  if (files.length === 0) {
-    return res.status(500).json({ error: `No images in: ${folder}` });
-  }
-
-  const file = pickRandom(files);
-  const url = `/images/${type.toLowerCase() === "receiver" ? "Receiver" : "QB"}/${file}`;
-  res.json({ url });
-});
-
-app.listen(PORT, () => {
   console.log(`Server running: http://localhost:${PORT}`);
->>>>>>> 8c5791d (Add files via upload)
 });
