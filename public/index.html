@@ -52,6 +52,28 @@
       white-space:nowrap;
     }
 
+    /* ✅ NEW: Tiny Admin link (top-right) */
+    .adminLink{
+      position:absolute;
+      top: calc(14px + env(safe-area-inset-top));
+      right: calc(14px + env(safe-area-inset-right));
+      z-index:101;
+      font-size:11px;
+      letter-spacing:0.14em;
+      text-transform:uppercase;
+      padding:8px 12px;
+      border-radius:999px;
+      background:rgba(0,0,0,0.45);
+      border:1px solid rgba(255,255,255,0.14);
+      backdrop-filter: blur(10px);
+      box-shadow:0 10px 30px rgba(0,0,0,0.55);
+      color:rgba(255,255,255,0.9);
+      text-decoration:none;
+      user-select:none;
+    }
+    .adminLink:hover{ background:rgba(0,0,0,0.6); }
+    .adminLink:active{ transform: translateY(1px); }
+
     #image{
       max-width:100vw;
       max-height:100vh;
@@ -202,6 +224,9 @@
   <div class="stage">
     <div class="topTitle">Endzone Madness</div>
 
+    <!-- ✅ NEW: Admin link -->
+    <a class="adminLink" href="/admin.html">ADMIN</a>
+
     <img id="image" alt="">
     <div class="veil"></div>
 
@@ -229,8 +254,7 @@
     const QB_SPIN_MS = 5400;
     const RECEIVER_SPIN_MS = 5400;
 
-    // Touchdown flash duration (match CSS: 2200ms)
-    const TD_FLASH_MS = 2200;
+    const TD_FLASH_MS = 2200; // match CSS
 
     const img = document.getElementById("image");
     const spinLabel = document.getElementById("spinLabel");
@@ -256,15 +280,13 @@
       btnReceiver.classList.toggle("disabled", d);
     }
 
-    // ✅ Mobile browsers require a user gesture once to allow sound.
-    // ✅ IMPORTANT FIX: unlocking must NEVER make audible sound.
+    // ✅ Unlock audio WITHOUT sound
     let audioUnlocked = false;
     function unlockAudioOnce(){
       if (audioUnlocked) return;
       audioUnlocked = true;
 
       try{
-        // Force silent and keep it silent; we only raise volume right before TD play
         tdAudio.volume = 0;
         tdAudio.muted = true;
 
@@ -285,9 +307,9 @@
 
     function playTDCrowd(){
       try{
-        // Ensure it only becomes audible here (TOUCHDOWN only)
         tdAudio.pause();
         tdAudio.currentTime = 0;
+
         tdAudio.muted = false;
         tdAudio.volume = 1;
 
@@ -299,7 +321,6 @@
         try{
           tdAudio.pause();
           tdAudio.currentTime = 0;
-          // go back to muted so Chrome can’t randomly leak audio
           tdAudio.muted = true;
           tdAudio.volume = 0;
         }catch{}
@@ -321,14 +342,14 @@
       spinning = true;
       setButtonsDisabled(true);
 
-      // extra safe: unlock audio on button click (still silent)
+      // still silent
       unlockAudioOnce();
 
       img.style.display = "block";
       spinLabel.textContent = type==="QB" ? "QB PASSING…" : "CATCHING…";
       spinLabel.style.display = "block";
 
-      // ✅ Surprise: hide the bottom label until spin ends
+      // ✅ Surprise: hide bottom pill until result is ready
       bottomPill.style.visibility = "hidden";
 
       const duration = type==="QB" ? QB_SPIN_MS : RECEIVER_SPIN_MS;
@@ -359,7 +380,6 @@
           bottomPill.innerHTML = "<span class='gold'>ERROR</span>";
         }
 
-        // ✅ Reveal label only after result is ready
         bottomPill.style.visibility = "visible";
 
         spinLabel.style.display = "none";
@@ -371,7 +391,7 @@
     btnQB.onclick = () => spin("QB");
     btnReceiver.onclick = () => spin("Receiver");
 
-    // Initial image on load (professional look)
+    // Initial image on load
     (async()=>{
       try{
         const d = await fetchJSON("/api/random-image?type=QB");
