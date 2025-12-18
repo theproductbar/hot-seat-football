@@ -19,7 +19,23 @@ const RECEIVERS_SHEET_URL =
 /* =========================
    Static files
    ========================= */
-app.use(express.static(path.join(__dirname, "public")));
+const PUBLIC_DIR = path.join(__dirname, "public");
+app.use(express.static(PUBLIC_DIR));
+
+/* =========================
+   ✅ Explicit pages (fixes /admin.html 404 on Vercel)
+   ========================= */
+app.get("/", (req, res) => {
+  res.sendFile(path.join(PUBLIC_DIR, "index.html"));
+});
+
+app.get("/index.html", (req, res) => {
+  res.sendFile(path.join(PUBLIC_DIR, "index.html"));
+});
+
+app.get("/admin.html", (req, res) => {
+  res.sendFile(path.join(PUBLIC_DIR, "admin.html"));
+});
 
 /* =========================
    Random Image (UNCHANGED)

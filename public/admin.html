@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
+  <title>Endzone Admin — Receiver Players</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{
+      min-height:100svh;
+      display:flex;
+      justify-content:center;
+      align-items:flex-start;
+      background:#000;
+      color:#fff;
+      font-family:system-ui,-apple-system,Segoe UI,sans-serif;
+      padding:24px 14px;
+    }
+    .card{
+      width:min(720px, 94vw);
+      background:rgba(255,255,255,0.06);
+      border:1px solid rgba(255,255,255,0.10);
+      border-radius:18px;
+      padding:18px;
+      box-shadow:0 22px 60px rgba(0,0,0,0.7);
+    }
+    .title{
+      font-weight:900;
+      letter-spacing:.18em;
+      text-transform:uppercase;
+      font-size:14px;
+      margin-bottom:10px;
+    }
+    .sub{
+      opacity:.75;
+      font-size:12px;
+      line-height:1.35;
+      margin-bottom:14px;
+    }
+    .row{
+      display:flex;
+      gap:10px;
+      flex-wrap:wrap;
+      margin-bottom:14px;
+    }
+    input{
+      flex:1 1 220px;
+      min-width:220px;
+      padding:14px 14px;
+      border-radius:999px;
+      border:1px solid rgba(255,255,255,0.12);
+      background:rgba(0,0,0,0.45);
+      color:#fff;
+      outline:none;
+      font-weight:700;
+      letter-spacing:.04em;
+    }
+    button{
+      padding:14px 16px;
+      border-radius:999px;
+      border:none;
+      cursor:pointer;
+      font-weight:900;
+      letter-spacing:.12em;
+      text-transform:uppercase;
+      background:rgba(255,255,255,0.18);
+      color:#fff;
+    }
+    button:active{transform:scale(.99)}
+    .list{
+      margin-top:6px;
+      display:flex;
+      flex-direction:column;
+      gap:10px;
+    }
+    .pill{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+      padding:12px 14px;
+      border-radius:999px;
+      background:rgba(0,0,0,0.55);
+      border:1px solid rgba(255,255,255,0.10);
+    }
+    .name{
+      font-weight:900;
+      letter-spacing:.08em;
+      text-transform:uppercase;
+      font-size:12px;
+      overflow:hidden;
+      text-overflow:ellipsis;
+      white-space:nowrap;
+    }
+    .danger{
+      background:rgba(239,68,68,0.22);
+      border:1px solid rgba(239,68,68,0.35);
+    }
+    .status{
+      opacity:.75;
+      font-size:12px;
+      margin-top:12px;
+      min-height:18px;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="title">Receiver Players Admin</div>
+    <div class="sub">
+      Add/remove players before the game. (This updates your Google Sheet.)
+    </div>
+
+    <div class="row">
+      <input id="nameInput" placeholder="Type player name…" />
+      <button id="addBtn">Add</button>
+      <button id="refreshBtn">Refresh</button>
+    </div>
+
+    <div class="list" id="list"></div>
+    <div class="status" id="status"></div>
+  </div>
+
+  <script>
+    // ✅ PASTE YOUR VALUES HERE:
+    const APPS_SCRIPT_URL = "PASTE_YOUR_WEB_APP_URL_HERE";
+    const TOKEN = "CHANGE_ME_TO_A_SECRET_TOKEN";
+
+    const listEl = document.getElementById("list");
+    const statusEl = document.getElementById("status");
+    const inputEl = document.getElementById("nameInput");
+
+    function setStatus(msg){ statusEl.textContent = msg || ""; }
+
+    async function apiList(){
+      const url = `${APPS_SCRIPT_URL}?action=list&token=${encodeURIComponent(TOKEN)}&t=${Date.now()}`;
+      const r = await fetch(url);
+      const data = await r.json();
+      if (data.error) throw new Error(data.error);
+      return data.players || [];
+    }
+
+    async function apiPost(payload){
+      const r = await fetch(APPS_SCRIPT_URL, {
+        method: "POST",
+        headers: { "Content-Type":"application/json" },
+        body: JSON.stringify(payload)
+      });
+      const data = await r.json();
+      if (data.error) throw new Error(data.error);
+      return data;
+    }
+
+    function render(players){
+      listEl.innerHTML = "";
+      players.forEach(name => {
+        const row = document.createElement("div");
+        row.className = "pill";
+
+        const left = document.createElement("div");
+        left.className = "name";
+        left.textContent = name;
+
+        const del = document.createElement("button");
+        del.className = "danger";
+        del.textContent = "Delete";
+        del.onclick = async () => {
+          try{
+            setStatus("Deleting…");
+            await apiPost({ action:"delete", token:TOKEN, name });
+            await refresh();
+            setStatus("Deleted.");
+          }catch(e){
+            setStatus("Error: " + e.message);
+          }
+        };
+
+        row.appendChild(left);
+        row.appendChild(del);
+        listEl.appendChild(row);
+      });
+    }
+
+    async function refresh(){
+      setStatus("Loading…");
+      const players = await apiList();
+      render(players);
+      setStatus(`Loaded ${players.length} players.`);
+    }
+
+    document.getElementById("refreshBtn").onclick = () => refresh();
+
+    document.getElementById("addBtn").onclick = async () => {
+      const name = (inputEl.value || "").trim();
+      if (!name) return setStatus("Type a name first.");
+      try{
+        setStatus("Adding…");
+        await apiPost({ action:"add", token:TOKEN, name });
+        inputEl.value = "";
+        await refresh();
+        setStatus("Added.");
+      }catch(e){
+        setStatus("Error: " + e.message);
+      }
+    };
+
+    inputEl.addEventListener("keydown", (e)=>{
+      if (e.key === "Enter") document.getElementById("addBtn").click();
+    });
+
+    refresh().catch(e => setStatus("Error: " + e.message));
+  </script>
+</body>
+</html>
