@@ -165,7 +165,7 @@
       mix-blend-mode:screen;
       pointer-events:none;
     }
-    .flash.play{ animation:flashAnim 2200ms ease-out 1; } /* <- LONGER */
+    .flash.play{ animation:flashAnim 2200ms ease-out 1; }
     @keyframes flashAnim{
       0%{opacity:0}
       10%{opacity:1}
@@ -183,7 +183,7 @@
       pointer-events:none;
       z-index:9999;
     }
-    #tdFlash.flash{ animation:tdFlashAnim 2200ms ease-in-out 1; } /* <- LONGER */
+    #tdFlash.flash{ animation:tdFlashAnim 2200ms ease-in-out 1; }
     @keyframes tdFlashAnim{
       0%{opacity:0}
       10%{opacity:.95}
@@ -221,7 +221,7 @@
 
   <div id="tdFlash"></div>
 
-  <!-- ✅ Crowd sound (you add the mp3 file) -->
+  <!-- ✅ Crowd sound (file must exist at public/sounds/td-crowd.mp3) -->
   <audio id="tdAudio" preload="auto" src="/sounds/td-crowd.mp3"></audio>
 
   <script>
@@ -247,7 +247,7 @@
     async function fetchJSON(url){
       const sep = url.includes("?") ? "&" : "?";
       const r = await fetch(url + sep + "t=" + Date.now());
-      if(!r.ok) throw new Error();
+      if(!r.ok) throw new Error(await r.text());
       return r.json();
     }
 
@@ -256,6 +256,32 @@
       btnReceiver.classList.toggle("disabled", d);
     }
 
+    // ✅ IMPORTANT: Mobile browsers require a user gesture once to allow sound.
+    let audioUnlocked = false;
+    function unlockAudioOnce(){
+      if (audioUnlocked) return;
+      audioUnlocked = true;
+
+      // Prime audio silently so later plays succeed
+      try{
+        tdAudio.volume = 0;
+        const p = tdAudio.play();
+        if (p && p.then){
+          p.then(()=>{
+            tdAudio.pause();
+            tdAudio.currentTime = 0;
+            tdAudio.volume = 1;
+          }).catch(()=>{ tdAudio.volume = 1; });
+        } else {
+          tdAudio.volume = 1;
+        }
+      }catch{
+        tdAudio.volume = 1;
+      }
+    }
+    document.addEventListener("touchstart", unlockAudioOnce, { once:true });
+    document.addEventListener("click", unlockAudioOnce, { once:true });
+
     function playTDCrowd(){
       try{
         tdAudio.pause();
@@ -263,22 +289,19 @@
         const p = tdAudio.play();
         if (p && p.catch) p.catch(()=>{});
       }catch{}
-      // stop it when flash ends
+
       setTimeout(()=>{
         try{ tdAudio.pause(); }catch{}
       }, TD_FLASH_MS);
     }
 
     function playTD(){
-      // visuals
       flash.classList.remove("play");
       tdFlash.classList.remove("flash");
       void flash.offsetWidth;
       void tdFlash.offsetWidth;
       flash.classList.add("play");
       tdFlash.classList.add("flash");
-
-      // sound during the flash
       playTDCrowd();
     }
 
@@ -286,6 +309,9 @@
       if(spinning) return;
       spinning=true;
       setButtonsDisabled(true);
+
+      // unlock audio on button click too (extra safe)
+      unlockAudioOnce();
 
       img.style.display="block";
       spinLabel.textContent = type==="QB" ? "QB PASSING…" : "CATCHING…";
