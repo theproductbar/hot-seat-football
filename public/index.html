@@ -221,7 +221,7 @@
 
   <div id="tdFlash"></div>
 
-  <!-- ✅ Crowd sound (file must exist at public/sounds/td-crowd.mp3) -->
+  <!-- ✅ Crowd sound -->
   <audio id="tdAudio" preload="auto" src="/sounds/td-crowd.mp3"></audio>
 
   <script>
@@ -242,7 +242,7 @@
     const btnQB = document.getElementById("btnQB");
     const btnReceiver = document.getElementById("btnReceiver");
 
-    let spinning=false, spinInterval=null;
+    let spinning = false, spinInterval = null;
 
     async function fetchJSON(url){
       const sep = url.includes("?") ? "&" : "?";
@@ -256,42 +256,53 @@
       btnReceiver.classList.toggle("disabled", d);
     }
 
-    // ✅ IMPORTANT: Mobile browsers require a user gesture once to allow sound.
+    // ✅ Mobile browsers require a user gesture once to allow sound.
+    // ✅ IMPORTANT FIX: unlocking must NEVER make audible sound.
     let audioUnlocked = false;
     function unlockAudioOnce(){
       if (audioUnlocked) return;
       audioUnlocked = true;
 
-      // Prime audio silently so later plays succeed
       try{
+        // Force silent and keep it silent; we only raise volume right before TD play
         tdAudio.volume = 0;
+        tdAudio.muted = true;
+
         const p = tdAudio.play();
         if (p && p.then){
           p.then(()=>{
             tdAudio.pause();
             tdAudio.currentTime = 0;
-            tdAudio.volume = 1;
-          }).catch(()=>{ tdAudio.volume = 1; });
+          }).catch(()=>{});
         } else {
-          tdAudio.volume = 1;
+          tdAudio.pause();
+          tdAudio.currentTime = 0;
         }
-      }catch{
-        tdAudio.volume = 1;
-      }
+      }catch{}
     }
     document.addEventListener("touchstart", unlockAudioOnce, { once:true });
     document.addEventListener("click", unlockAudioOnce, { once:true });
 
     function playTDCrowd(){
       try{
+        // Ensure it only becomes audible here (TOUCHDOWN only)
         tdAudio.pause();
         tdAudio.currentTime = 0;
+        tdAudio.muted = false;
+        tdAudio.volume = 1;
+
         const p = tdAudio.play();
         if (p && p.catch) p.catch(()=>{});
       }catch{}
 
       setTimeout(()=>{
-        try{ tdAudio.pause(); }catch{}
+        try{
+          tdAudio.pause();
+          tdAudio.currentTime = 0;
+          // go back to muted so Chrome can’t randomly leak audio
+          tdAudio.muted = true;
+          tdAudio.volume = 0;
+        }catch{}
       }, TD_FLASH_MS);
     }
 
@@ -307,59 +318,65 @@
 
     async function spin(type){
       if(spinning) return;
-      spinning=true;
+      spinning = true;
       setButtonsDisabled(true);
 
-      // unlock audio on button click too (extra safe)
+      // extra safe: unlock audio on button click (still silent)
       unlockAudioOnce();
 
-      img.style.display="block";
+      img.style.display = "block";
       spinLabel.textContent = type==="QB" ? "QB PASSING…" : "CATCHING…";
-      spinLabel.style.display="block";
+      spinLabel.style.display = "block";
+
+      // ✅ Surprise: hide the bottom label until spin ends
+      bottomPill.style.visibility = "hidden";
 
       const duration = type==="QB" ? QB_SPIN_MS : RECEIVER_SPIN_MS;
 
-      spinInterval=setInterval(async()=>{
+      spinInterval = setInterval(async()=>{
         try{
-          const d=await fetchJSON(`/api/random-image?type=${encodeURIComponent(type)}`);
-          img.src=d.url;
+          const d = await fetchJSON(`/api/random-image?type=${encodeURIComponent(type)}`);
+          img.src = d.url;
         }catch{}
-      },SPIN_SPEED_MS);
+      }, SPIN_SPEED_MS);
 
       setTimeout(async()=>{
         clearInterval(spinInterval);
 
         try{
-          const d=await fetchJSON(`/api/random-image?type=${encodeURIComponent(type)}`);
-          img.src=d.url;
+          const d = await fetchJSON(`/api/random-image?type=${encodeURIComponent(type)}`);
+          img.src = d.url;
 
           if(type==="QB"){
-            const p=await fetchJSON("/api/random-player");
-            bottomPill.innerHTML=`PASS TO: <span class="gold">${p.name}</span>`;
+            const p = await fetchJSON("/api/random-player");
+            bottomPill.innerHTML = `PASS TO: <span class="gold">${p.name}</span>`;
           }else{
-            const c=await fetchJSON("/api/random-catch");
-            bottomPill.innerHTML=`CATCH: <span class="gold">${c.catch}</span>`;
+            const c = await fetchJSON("/api/random-catch");
+            bottomPill.innerHTML = `CATCH: <span class="gold">${c.catch}</span>`;
             if(String(c.catch).toUpperCase().includes("TOUCHDOWN")) playTD();
           }
         }catch{
-          bottomPill.innerHTML="<span class='gold'>ERROR</span>";
+          bottomPill.innerHTML = "<span class='gold'>ERROR</span>";
         }
 
-        spinLabel.style.display="none";
-        spinning=false;
+        // ✅ Reveal label only after result is ready
+        bottomPill.style.visibility = "visible";
+
+        spinLabel.style.display = "none";
+        spinning = false;
         setButtonsDisabled(false);
-      },duration);
+      }, duration);
     }
 
-    btnQB.onclick=()=>spin("QB");
-    btnReceiver.onclick=()=>spin("Receiver");
+    btnQB.onclick = () => spin("QB");
+    btnReceiver.onclick = () => spin("Receiver");
 
-    // Initial image on load
+    // Initial image on load (professional look)
     (async()=>{
       try{
-        const d=await fetchJSON("/api/random-image?type=QB");
-        img.src=d.url;
-        img.style.display="block";
+        const d = await fetchJSON("/api/random-image?type=QB");
+        img.src = d.url;
+        img.style.display = "block";
       }catch{}
     })();
   </script>
