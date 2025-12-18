@@ -52,7 +52,7 @@
       white-space:nowrap;
     }
 
-    /* ✅ NEW: Tiny Admin link (top-right) */
+    /* ✅ Tiny Admin link (top-right) */
     .adminLink{
       position:absolute;
       top: calc(14px + env(safe-area-inset-top));
@@ -224,7 +224,7 @@
   <div class="stage">
     <div class="topTitle">Endzone Madness</div>
 
-    <!-- ✅ NEW: Admin link -->
+    <!-- ✅ Admin link -->
     <a class="adminLink" href="/admin.html">ADMIN</a>
 
     <img id="image" alt="">
@@ -255,6 +255,9 @@
     const RECEIVER_SPIN_MS = 5400;
 
     const TD_FLASH_MS = 2200; // match CSS
+
+    // ✅ Must match admin.html storage key
+    const ADMIN_OVERRIDE_KEY = "endzone_receiver_players_override_v1";
 
     const img = document.getElementById("image");
     const spinLabel = document.getElementById("spinLabel");
@@ -337,6 +340,22 @@
       playTDCrowd();
     }
 
+    // ✅ FIX: If admin override exists on this device, use it for QB PASS player names
+    async function getQBPlayerName(){
+      try{
+        const raw = localStorage.getItem(ADMIN_OVERRIDE_KEY);
+        if(!raw) return await fetchJSON("/api/random-player");
+
+        const list = JSON.parse(raw);
+        if(!Array.isArray(list) || list.length === 0) return await fetchJSON("/api/random-player");
+
+        const pick = list[Math.floor(Math.random() * list.length)];
+        return { name: String(pick) };
+      }catch{
+        return await fetchJSON("/api/random-player");
+      }
+    }
+
     async function spin(type){
       if(spinning) return;
       spinning = true;
@@ -369,7 +388,7 @@
           img.src = d.url;
 
           if(type==="QB"){
-            const p = await fetchJSON("/api/random-player");
+            const p = await getQBPlayerName();  // ✅ uses admin override if available
             bottomPill.innerHTML = `PASS TO: <span class="gold">${p.name}</span>`;
           }else{
             const c = await fetchJSON("/api/random-catch");

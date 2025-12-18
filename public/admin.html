@@ -3,212 +3,280 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
-  <title>Endzone Admin — Receiver Players</title>
+  <title>Receiver Players Admin</title>
   <style>
     *{box-sizing:border-box;margin:0;padding:0}
+    html,body{height:100%}
     body{
-      min-height:100svh;
-      display:flex;
-      justify-content:center;
-      align-items:flex-start;
-      background:#000;
-      color:#fff;
-      font-family:system-ui,-apple-system,Segoe UI,sans-serif;
-      padding:24px 14px;
+      background:#000;color:#fff;
+      font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+      display:flex;justify-content:center;align-items:flex-start;
+      padding:24px;
     }
     .card{
-      width:min(720px, 94vw);
+      width:min(980px,96vw);
+      border-radius:28px;
       background:rgba(255,255,255,0.06);
-      border:1px solid rgba(255,255,255,0.10);
-      border-radius:18px;
-      padding:18px;
-      box-shadow:0 22px 60px rgba(0,0,0,0.7);
-    }
-    .title{
-      font-weight:900;
-      letter-spacing:.18em;
-      text-transform:uppercase;
-      font-size:14px;
-      margin-bottom:10px;
-    }
-    .sub{
-      opacity:.75;
-      font-size:12px;
-      line-height:1.35;
-      margin-bottom:14px;
-    }
-    .row{
-      display:flex;
-      gap:10px;
-      flex-wrap:wrap;
-      margin-bottom:14px;
-    }
-    input{
-      flex:1 1 220px;
-      min-width:220px;
-      padding:14px 14px;
-      border-radius:999px;
       border:1px solid rgba(255,255,255,0.12);
-      background:rgba(0,0,0,0.45);
+      box-shadow:0 30px 80px rgba(0,0,0,0.65);
+      padding:26px;
+      position:relative;
+    }
+    h1{
+      font-size:18px;
+      letter-spacing:0.28em;
+      text-transform:uppercase;
+      margin-bottom:12px;
+      opacity:0.95;
+    }
+    .topRow{
+      display:flex;
+      gap:14px;
+      align-items:center;
+      margin-bottom:18px;
+    }
+    .back{
+      margin-left:auto;
+      font-size:12px;
+      letter-spacing:0.18em;
+      text-transform:uppercase;
+      padding:10px 14px;
+      border-radius:999px;
+      border:1px solid rgba(255,255,255,0.16);
+      background:rgba(0,0,0,0.25);
+      color:#fff;
+      text-decoration:none;
+    }
+    .input{
+      flex:1;
+      padding:16px 18px;
+      border-radius:999px;
+      border:1px solid rgba(255,255,255,0.14);
+      background:rgba(0,0,0,0.25);
       color:#fff;
       outline:none;
-      font-weight:700;
-      letter-spacing:.04em;
+      font-size:16px;
     }
-    button{
-      padding:14px 16px;
+    .btn{
+      padding:16px 22px;
       border-radius:999px;
       border:none;
       cursor:pointer;
       font-weight:900;
-      letter-spacing:.12em;
+      letter-spacing:0.14em;
       text-transform:uppercase;
-      background:rgba(255,255,255,0.18);
-      color:#fff;
+      box-shadow:0 18px 50px rgba(0,0,0,0.6);
     }
-    button:active{transform:scale(.99)}
+    .btnAdd{ background:#facc15; color:#111; }
+    .btnRefresh{ background:rgba(255,255,255,0.16); color:#fff; }
+    .btn:disabled{ opacity:0.5; cursor:not-allowed; }
+
+    .msg{
+      margin:10px 4px 14px;
+      font-size:14px;
+      opacity:0.9;
+      min-height:18px;
+    }
+
     .list{
       margin-top:6px;
-      display:flex;
-      flex-direction:column;
-      gap:10px;
+      border-top:1px solid rgba(255,255,255,0.08);
     }
-    .pill{
+    .row{
       display:flex;
       align-items:center;
       justify-content:space-between;
-      gap:10px;
-      padding:12px 14px;
-      border-radius:999px;
-      background:rgba(0,0,0,0.55);
-      border:1px solid rgba(255,255,255,0.10);
+      padding:18px 8px;
+      border-bottom:1px solid rgba(255,255,255,0.08);
+      gap:12px;
     }
     .name{
-      font-weight:900;
-      letter-spacing:.08em;
-      text-transform:uppercase;
-      font-size:12px;
+      font-size:18px;
+      font-weight:700;
+      opacity:0.95;
       overflow:hidden;
       text-overflow:ellipsis;
       white-space:nowrap;
+      max-width:70%;
     }
-    .danger{
-      background:rgba(239,68,68,0.22);
-      border:1px solid rgba(239,68,68,0.35);
+    .xbtn{
+      width:44px;height:44px;
+      border-radius:14px;
+      border:1px solid rgba(255,255,255,0.14);
+      background:rgba(0,0,0,0.25);
+      color:#fff;
+      cursor:pointer;
+      font-size:22px;
+      line-height:1;
     }
-    .status{
-      opacity:.75;
-      font-size:12px;
-      margin-top:12px;
-      min-height:18px;
-    }
+    .xbtn:hover{ background:rgba(255,255,255,0.08); }
   </style>
 </head>
+
 <body>
   <div class="card">
-    <div class="title">Receiver Players Admin</div>
-    <div class="sub">
-      Add/remove players before the game. (This updates your Google Sheet.)
+    <div class="topRow">
+      <div>
+        <h1>Receiver Players Admin</h1>
+        <div style="opacity:.75;margin-top:6px">Add/remove players before the game. (Updates Google Sheet.)</div>
+      </div>
+      <a class="back" href="/">Back</a>
     </div>
 
-    <div class="row">
-      <input id="nameInput" placeholder="Type player name…" />
-      <button id="addBtn">Add</button>
-      <button id="refreshBtn">Refresh</button>
+    <div class="topRow">
+      <input id="nameInput" class="input" placeholder="Add player name..." autocomplete="off" />
+      <button id="addBtn" class="btn btnAdd">Add</button>
+      <button id="refreshBtn" class="btn btnRefresh">Refresh</button>
     </div>
 
-    <div class="list" id="list"></div>
-    <div class="status" id="status"></div>
+    <div id="msg" class="msg"></div>
+
+    <div id="list" class="list"></div>
   </div>
 
   <script>
-    // ✅ PASTE YOUR VALUES HERE:
-    const APPS_SCRIPT_URL = "PASTE_YOUR_WEB_APP_URL_HERE";
-    const TOKEN = "CHANGE_ME_TO_A_SECRET_TOKEN";
+    const API = {
+      list: "/api/admin/receiver-players",
+      add:  "/api/admin/receiver-players",
+      del:  "/api/admin/receiver-players"
+    };
 
-    const listEl = document.getElementById("list");
-    const statusEl = document.getElementById("status");
-    const inputEl = document.getElementById("nameInput");
+    const elList = document.getElementById("list");
+    const elMsg = document.getElementById("msg");
+    const elInput = document.getElementById("nameInput");
+    const btnAdd = document.getElementById("addBtn");
+    const btnRefresh = document.getElementById("refreshBtn");
 
-    function setStatus(msg){ statusEl.textContent = msg || ""; }
+    let currentPlayers = [];
 
-    async function apiList(){
-      const url = `${APPS_SCRIPT_URL}?action=list&token=${encodeURIComponent(TOKEN)}&t=${Date.now()}`;
-      const r = await fetch(url);
-      const data = await r.json();
-      if (data.error) throw new Error(data.error);
-      return data.players || [];
+    const norm = (s) => String(s || "").trim().replace(/\s+/g, " ").toLowerCase();
+
+    function setMsg(text, isError=false){
+      elMsg.textContent = text || "";
+      elMsg.style.color = isError ? "#ff6b6b" : "rgba(255,255,255,0.85)";
     }
 
-    async function apiPost(payload){
-      const r = await fetch(APPS_SCRIPT_URL, {
-        method: "POST",
-        headers: { "Content-Type":"application/json" },
-        body: JSON.stringify(payload)
-      });
-      const data = await r.json();
-      if (data.error) throw new Error(data.error);
+    async function apiJSON(url, opts){
+      const res = await fetch(url, opts);
+      const txt = await res.text();
+      let data;
+      try { data = txt ? JSON.parse(txt) : {}; }
+      catch { throw new Error(txt || "Invalid JSON"); }
+      if (!res.ok) throw new Error(data.error || txt || "Request failed");
       return data;
     }
 
     function render(players){
-      listEl.innerHTML = "";
-      players.forEach(name => {
+      elList.innerHTML = ""; // ✅ clear before render
+
+      if (!players.length){
+        elList.innerHTML = `<div class="row"><div class="name" style="opacity:.6">No players yet</div></div>`;
+        return;
+      }
+
+      for (const name of players){
         const row = document.createElement("div");
-        row.className = "pill";
+        row.className = "row";
 
         const left = document.createElement("div");
         left.className = "name";
         left.textContent = name;
 
         const del = document.createElement("button");
-        del.className = "danger";
-        del.textContent = "Delete";
-        del.onclick = async () => {
-          try{
-            setStatus("Deleting…");
-            await apiPost({ action:"delete", token:TOKEN, name });
-            await refresh();
-            setStatus("Deleted.");
-          }catch(e){
-            setStatus("Error: " + e.message);
-          }
-        };
+        del.className = "xbtn";
+        del.textContent = "×";
+        del.setAttribute("data-del", name);
 
         row.appendChild(left);
         row.appendChild(del);
-        listEl.appendChild(row);
-      });
+        elList.appendChild(row);
+      }
     }
 
     async function refresh(){
-      setStatus("Loading…");
-      const players = await apiList();
-      render(players);
-      setStatus(`Loaded ${players.length} players.`);
+      setMsg("Loading…");
+      const data = await apiJSON(API.list);
+
+      const seen = new Set();
+      currentPlayers = (data.players || []).filter(n => {
+        const k = norm(n);
+        if (!k || seen.has(k)) return false;
+        seen.add(k);
+        return true;
+      });
+
+      render(currentPlayers);
+      setMsg("");
     }
 
-    document.getElementById("refreshBtn").onclick = () => refresh();
+    async function addPlayer(){
+      const name = String(elInput.value || "").trim().replace(/\s+/g, " ");
+      if (!name) { setMsg("Type a name first.", true); return; }
 
-    document.getElementById("addBtn").onclick = async () => {
-      const name = (inputEl.value || "").trim();
-      if (!name) return setStatus("Type a name first.");
-      try{
-        setStatus("Adding…");
-        await apiPost({ action:"add", token:TOKEN, name });
-        inputEl.value = "";
-        await refresh();
-        setStatus("Added.");
-      }catch(e){
-        setStatus("Error: " + e.message);
+      if (currentPlayers.some(p => norm(p) === norm(name))){
+        setMsg("That name is already in the list.", true);
+        elInput.value = "";
+        return;
       }
-    };
 
-    inputEl.addEventListener("keydown", (e)=>{
-      if (e.key === "Enter") document.getElementById("addBtn").click();
+      btnAdd.disabled = true;
+      btnRefresh.disabled = true;
+
+      try{
+        setMsg("Adding…");
+        await apiJSON(API.add, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name })
+        });
+        elInput.value = "";
+        await refresh();
+        setMsg("Added.");
+      }catch(e){
+        setMsg("Error: " + e.message, true);
+      }finally{
+        btnAdd.disabled = false;
+        btnRefresh.disabled = false;
+      }
+    }
+
+    async function deletePlayer(name){
+      btnAdd.disabled = true;
+      btnRefresh.disabled = true;
+
+      try{
+        setMsg("Deleting…");
+
+        // ✅ FIX: send name in DELETE JSON body (most servers expect this)
+        await apiJSON(API.del, {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name })
+        });
+
+        await refresh();
+        setMsg("Deleted.");
+      }catch(e){
+        setMsg("Error: " + e.message, true);
+      }finally{
+        btnAdd.disabled = false;
+        btnRefresh.disabled = false;
+      }
+    }
+
+    elList.addEventListener("click", (e) => {
+      const btn = e.target.closest("[data-del]");
+      if (!btn) return;
+      deletePlayer(btn.getAttribute("data-del"));
     });
 
-    refresh().catch(e => setStatus("Error: " + e.message));
+    btnAdd.addEventListener("click", addPlayer);
+    btnRefresh.addEventListener("click", refresh);
+    elInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") addPlayer();
+    });
+
+    refresh();
   </script>
 </body>
 </html>
