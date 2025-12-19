@@ -1,27 +1,17 @@
 const express = require("express");
 const path = require("path");
 const fs = require("fs");
-const fetch = require("node-fetch");
+//const fetch = require("node-fetch");
 const csv = require("csv-parser");
 const { Readable } = require("stream");
 const { google } = require("googleapis");
 
 const app = express();
-
-/* =========================
-   Middleware
-========================= */
 app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-
-/* =========================
-   Static files (public/)
-========================= */
-app.use(express.static(path.join(__dirname, "..", "public")));
 
 /* =========================
    ENV helpers
-========================= */
+   ========================= */
 function mustEnv(name) {
   const v = process.env[name];
   if (!v) throw new Error(`Missing env var: ${name}`);
@@ -29,34 +19,32 @@ function mustEnv(name) {
 }
 
 function getServiceAccountJSON() {
-  // Prefer Base64 (best for Vercel)
+  // Support either raw JSON env var OR base64 env var (you used B64 earlier)
+  const raw = process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
   const b64 = process.env.GOOGLE_SERVICE_ACCOUNT_JSON_B64;
-  if (b64 && b64.trim()) {
-    const decoded = Buffer.from(b64.trim(), "base64").toString("utf8");
+
+  if (raw) return JSON.parse(raw);
+
+  if (b64) {
+    const decoded = Buffer.from(b64, "base64").toString("utf-8").trim();
     return JSON.parse(decoded);
   }
 
-  // Fallback (not recommended)
-  const raw = process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
-  if (raw && raw.trim()) {
-    const fixed = raw.replace(/\\n/g, "\n");
-    return JSON.parse(fixed);
-  }
-
-  throw new Error(
-    "Missing GOOGLE_SERVICE_ACCOUNT_JSON_B64 (recommended) or GOOGLE_SERVICE_ACCOUNT_JSON"
-  );
+  throw new Error("Missing env var: GOOGLE_SERVICE_ACCOUNT_JSON or GOOGLE_SERVICE_ACCOUNT_JSON_B64");
 }
 
-function getSheetsClient(scopes) {
-  const sa = getServiceAccountJSON();
-  const auth = new google.auth.JWT(sa.client_email, null, sa.private_key, scopes);
-  return google.sheets({ version: "v4", auth });
-}
+const PLAYERS_SHEET_ID = mustEnv("PLAYERS_SHEET_ID");
+const PLAYERS_TAB_NAME = mustEnv("PLAYERS_TAB_NAME"); // e.g. ReceiverPlayers
+const RECEIVERS_SHEET_URL = mustEnv("RECEIVERS_SHEET_URL"); // published CSV URL
+
+/* =========================
+   Static files
+   ========================= */
+app.use(express.static(path.join(__dirname, "..", "public")));
 
 /* =========================
    Random Image
-========================= */
+   ========================= */
 app.get("/api/random-image", (req, res) => {
   const type = (req.query.type || "QB").toLowerCase();
 
@@ -75,21 +63,20 @@ app.get("/api/random-image", (req, res) => {
   if (!files.length) return res.status(500).json({ error: "No images found" });
 
   const pick = files[Math.floor(Math.random() * files.length)];
-  res.json({
-    url: `/images/${type === "receiver" ? "Receiver" : "QB"}/${pick}`
-  });
+  res.json({ url: `/images/${type === "receiver" ? "Receiver" : "QB"}/${pick}` });
 });
 
 /* =========================
-   CSV helper (Receivers)
-========================= */
+   Receivers (Published CSV)
+   mode=normal -> column "catch"
+   mode=sb     -> column "final"
+   ========================= */
 async function readCSV(url, column) {
   const r = await fetch(url);
-  if (!r.ok) throw new Error("Failed to fetch CSV");
-
+  if (!r.ok) throw new Error(`Failed to fetch CSV (${r.status})`);
   const text = await r.text();
-  const values = [];
 
+  const values = [];
   return new Promise((resolve, reject) => {
     Readable.from(text)
       .pipe(csv())
@@ -101,85 +88,124 @@ async function readCSV(url, column) {
   });
 }
 
+app.get("/api/random-catch", async (req, res) => {
+  try {
+    const mode = String(req.query.mode || "normal").toLowerCase();
+    const column = mode === "sb" ? "final" : "catch";
+
+    let results = await readCSV(RECEIVERS_SHEET_URL, column);
+
+    // Fallback if "final" is empty/missing
+    if (!results.length && column === "final") {
+      results = await readCSV(RECEIVERS_SHEET_URL, "catch");
+    }
+
+    if (!results.length) return res.status(500).json({ error: "No catches found" });
+
+    res.json({ catch: results[Math.floor(Math.random() * results.length)] });
+  } catch (err) {
+    res.status(500).json({ error: "Failed to read receivers sheet", details: err.message });
+  }
+});
+
 /* =========================
-   Random Player (Google Sheet via Service Account)
-   Reads column A (A2:A)
-========================= */
+   Players (Google Sheets API) - Admin Managed
+   Sheet must have header row with column name: "name"
+   ========================= */
+async function getSheetsClient() {
+  const sa = getServiceAccountJSON();
+
+  const auth = new google.auth.JWT({
+    email: sa.client_email,
+    key: sa.private_key,
+    scopes: ["https://www.googleapis.com/auth/spreadsheets"],
+  });
+
+  await auth.authorize();
+  return google.sheets({ version: "v4", auth });
+}
+
+function a1Range(tabName) {
+  // Column A = "name"
+  return `${tabName}!A:A`;
+}
+
+async function readPlayersFromSheet() {
+  const sheets = await getSheetsClient();
+
+  const resp = await sheets.spreadsheets.values.get({
+    spreadsheetId: PLAYERS_SHEET_ID,
+    range: a1Range(PLAYERS_TAB_NAME),
+  });
+
+  const rows = resp.data.values || [];
+  // Expect header in first row, names below
+  const names = rows
+    .slice(1)
+    .map(r => (r[0] || "").trim())
+    .filter(Boolean);
+
+  // Make unique while keeping order
+  const seen = new Set();
+  const unique = [];
+  for (const n of names) {
+    const k = n.toLowerCase();
+    if (!seen.has(k)) {
+      seen.add(k);
+      unique.push(n);
+    }
+  }
+  return unique;
+}
+
+async function writePlayersToSheet(players) {
+  const sheets = await getSheetsClient();
+
+  // Rewrite entire column A: header + list
+  const values = [["name"], ...players.map(n => [n])];
+
+  await sheets.spreadsheets.values.update({
+    spreadsheetId: PLAYERS_SHEET_ID,
+    range: `${PLAYERS_TAB_NAME}!A1`,
+    valueInputOption: "RAW",
+    requestBody: { values },
+  });
+}
+
+/* ===== Game API uses players ===== */
 app.get("/api/random-player", async (req, res) => {
   try {
-    const SHEET_ID = mustEnv("PLAYERS_SHEET_ID");
-    const TAB = mustEnv("PLAYERS_TAB_NAME");
-
-    const sheets = getSheetsClient([
-      "https://www.googleapis.com/auth/spreadsheets.readonly"
-    ]);
-
-    const range = `${TAB}!A2:A`;
-    const resp = await sheets.spreadsheets.values.get({
-      spreadsheetId: SHEET_ID,
-      range
-    });
-
-    const rows = resp.data.values || [];
-    const players = rows.map(r => (r?.[0] ? String(r[0]).trim() : "")).filter(Boolean);
-
+    const players = await readPlayersFromSheet();
     if (!players.length) return res.status(500).json({ error: "No players found" });
 
     res.json({ name: players[Math.floor(Math.random() * players.length)] });
   } catch (err) {
-    res.status(500).json({
-      error: "Failed to read players sheet",
-      details: err.message
-    });
+    res.status(500).json({ error: "Failed to read players sheet", details: err.message });
   }
 });
 
-/* =========================
-   Random Catch (Receivers sheet published CSV)
-========================= */
-const crypto = require("crypto");
-
-app.get("/api/random-catch", async (req, res) => {
-  try {
-    // Always fresh (prevents any caching weirdness)
-    res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
-    res.setHeader("Pragma", "no-cache");
-    res.setHeader("Expires", "0");
-
-    const catches = await readCSV(process.env.RECEIVERS_SHEET_URL, "catch");
-    if (!catches.length) return res.status(500).json({ error: "No catches found" });
-
-    const idx = crypto.randomInt(0, catches.length);
-    res.json({ catch: catches[idx] });
-
-  } catch (err) {
-    res.status(500).json({
-      error: "Failed to read receivers sheet",
-      details: err.message
-    });
-  }
-});
-
-/* =========================
-   ADMIN: list players
-========================= */
+/* ===== Admin API ===== */
 app.get("/api/admin/receiver-players", async (req, res) => {
   try {
-    const SHEET_ID = mustEnv("PLAYERS_SHEET_ID");
-    const TAB = mustEnv("PLAYERS_TAB_NAME");
+    const players = await readPlayersFromSheet();
+    res.json({ players });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
-    const sheets = getSheetsClient([
-      "https://www.googleapis.com/auth/spreadsheets.readonly"
-    ]);
+app.post("/api/admin/receiver-players", async (req, res) => {
+  try {
+    const name = String(req.body?.name || "").trim();
+    if (!name) return res.status(400).json({ error: "Missing name" });
 
-    const range = `${TAB}!A2:A`;
-    const resp = await sheets.spreadsheets.values.get({
-      spreadsheetId: SHEET_ID,
-      range
-    });
+    const players = await readPlayersFromSheet();
 
-    const rows = resp.data.values || [];
-    const players = rows.map(r => (r?.[0] ? String(r[0]).trim() : "")).filter(Boolean);
+    // prevent duplicates
+    const exists = players.some(p => p.toLowerCase() === name.toLowerCase());
+    if (!exists) players.push(name);
+
+    await writePlayersToSheet(players);
 
     res.json({ players });
   } catch (err) {
@@ -187,98 +213,17 @@ app.get("/api/admin/receiver-players", async (req, res) => {
   }
 });
 
-/* =========================
-   ADMIN: add player
-   Body: { "name": "Cole" }
-========================= */
-app.post("/api/admin/receiver-players", async (req, res) => {
-  try {
-    const name = String(req.body?.name || "").trim();
-    if (!name) return res.status(400).json({ error: "Missing name" });
-
-    const SHEET_ID = mustEnv("PLAYERS_SHEET_ID");
-    const TAB = mustEnv("PLAYERS_TAB_NAME");
-
-    const sheets = getSheetsClient([
-      "https://www.googleapis.com/auth/spreadsheets"
-    ]);
-
-    // Add to bottom
-    await sheets.spreadsheets.values.append({
-      spreadsheetId: SHEET_ID,
-      range: `${TAB}!A:A`,
-      valueInputOption: "RAW",
-      insertDataOption: "INSERT_ROWS",
-      requestBody: {
-        values: [[name]]
-      }
-    });
-
-    res.json({ ok: true });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-/* =========================
-   ADMIN: delete player (all exact matches)
-   Body: { "name": "Cole" }
-========================= */
 app.delete("/api/admin/receiver-players", async (req, res) => {
   try {
     const name = String(req.body?.name || "").trim();
     if (!name) return res.status(400).json({ error: "Missing name" });
 
-    const SHEET_ID = mustEnv("PLAYERS_SHEET_ID");
-    const TAB = mustEnv("PLAYERS_TAB_NAME");
+    const players = await readPlayersFromSheet();
+    const filtered = players.filter(p => p.toLowerCase() !== name.toLowerCase());
 
-    const sheets = getSheetsClient([
-      "https://www.googleapis.com/auth/spreadsheets"
-    ]);
+    await writePlayersToSheet(filtered);
 
-    // 1) get sheet metadata (to find sheetId)
-    const meta = await sheets.spreadsheets.get({ spreadsheetId: SHEET_ID });
-    const sheet = meta.data.sheets.find(s => s.properties.title === TAB);
-    if (!sheet) return res.status(404).json({ error: `Tab not found: ${TAB}` });
-
-    const sheetId = sheet.properties.sheetId;
-
-    // 2) get current values to find matching rows
-    const valuesResp = await sheets.spreadsheets.values.get({
-      spreadsheetId: SHEET_ID,
-      range: `${TAB}!A2:A`
-    });
-
-    const rows = valuesResp.data.values || [];
-    // rows is 0-based for A2, so actual row index = i+2
-    const matches = [];
-    rows.forEach((r, i) => {
-      const v = r?.[0] ? String(r[0]).trim() : "";
-      if (v === name) matches.push(i + 2);
-    });
-
-    if (!matches.length) return res.json({ ok: true, deleted: 0 });
-
-    // 3) delete rows from bottom to top (so indices don't shift)
-    matches.sort((a, b) => b - a);
-
-    const requests = matches.map(rowNum => ({
-      deleteDimension: {
-        range: {
-          sheetId,
-          dimension: "ROWS",
-          startIndex: rowNum - 1, // 0-based inclusive
-          endIndex: rowNum // 0-based exclusive
-        }
-      }
-    }));
-
-    await sheets.spreadsheets.batchUpdate({
-      spreadsheetId: SHEET_ID,
-      requestBody: { requests }
-    });
-
-    res.json({ ok: true, deleted: matches.length });
+    res.json({ players: filtered });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -286,7 +231,7 @@ app.delete("/api/admin/receiver-players", async (req, res) => {
 
 /* =========================
    Health check
-========================= */
+   ========================= */
 app.get("/api/health", (_, res) => res.json({ ok: true }));
 
 module.exports = app;
