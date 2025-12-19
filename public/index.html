@@ -32,7 +32,6 @@
       padding-bottom: env(safe-area-inset-bottom);
     }
 
-    /* ===== TOP TITLE ===== */
     .topTitle{
       position:absolute;
       top: calc(14px + env(safe-area-inset-top));
@@ -52,7 +51,6 @@
       white-space:nowrap;
     }
 
-    /* ✅ Tiny Admin link (top-right) */
     .adminLink{
       position:absolute;
       top: calc(14px + env(safe-area-inset-top));
@@ -175,7 +173,6 @@
 
     .disabled{ opacity:.35; pointer-events:none; }
 
-    /* ===== Touchdown Flash #1 (color) — LONGER ===== */
     .flash{
       position:absolute;
       inset:0;
@@ -196,7 +193,6 @@
       100%{opacity:0}
     }
 
-    /* ===== Touchdown Flash #2 (white strobe) — LONGER ===== */
     #tdFlash{
       position:fixed;
       inset:0;
@@ -224,7 +220,6 @@
   <div class="stage">
     <div class="topTitle">Endzone Madness</div>
 
-    <!-- ✅ Admin link -->
     <a class="adminLink" href="/admin.html">ADMIN</a>
 
     <img id="image" alt="">
@@ -246,18 +241,13 @@
 
   <div id="tdFlash"></div>
 
-  <!-- ✅ Crowd sound -->
   <audio id="tdAudio" preload="auto" src="/sounds/td-crowd.mp3"></audio>
 
   <script>
     const SPIN_SPEED_MS = 90;
     const QB_SPIN_MS = 5400;
     const RECEIVER_SPIN_MS = 5400;
-
-    const TD_FLASH_MS = 2200; // match CSS
-
-    // ✅ Must match admin.html storage key
-    const ADMIN_OVERRIDE_KEY = "endzone_receiver_players_override_v1";
+    const TD_FLASH_MS = 2200;
 
     const img = document.getElementById("image");
     const spinLabel = document.getElementById("spinLabel");
@@ -283,7 +273,7 @@
       btnReceiver.classList.toggle("disabled", d);
     }
 
-    // ✅ Unlock audio WITHOUT sound
+    // Unlock audio WITHOUT sound
     let audioUnlocked = false;
     function unlockAudioOnce(){
       if (audioUnlocked) return;
@@ -312,7 +302,6 @@
       try{
         tdAudio.pause();
         tdAudio.currentTime = 0;
-
         tdAudio.muted = false;
         tdAudio.volume = 1;
 
@@ -340,35 +329,17 @@
       playTDCrowd();
     }
 
-    // ✅ FIX: If admin override exists on this device, use it for QB PASS player names
-    async function getQBPlayerName(){
-      try{
-        const raw = localStorage.getItem(ADMIN_OVERRIDE_KEY);
-        if(!raw) return await fetchJSON("/api/random-player");
-
-        const list = JSON.parse(raw);
-        if(!Array.isArray(list) || list.length === 0) return await fetchJSON("/api/random-player");
-
-        const pick = list[Math.floor(Math.random() * list.length)];
-        return { name: String(pick) };
-      }catch{
-        return await fetchJSON("/api/random-player");
-      }
-    }
-
     async function spin(type){
       if(spinning) return;
       spinning = true;
       setButtonsDisabled(true);
 
-      // still silent
       unlockAudioOnce();
 
       img.style.display = "block";
       spinLabel.textContent = type==="QB" ? "QB PASSING…" : "CATCHING…";
       spinLabel.style.display = "block";
 
-      // ✅ Surprise: hide bottom pill until result is ready
       bottomPill.style.visibility = "hidden";
 
       const duration = type==="QB" ? QB_SPIN_MS : RECEIVER_SPIN_MS;
@@ -388,14 +359,14 @@
           img.src = d.url;
 
           if(type==="QB"){
-            const p = await getQBPlayerName();  // ✅ uses admin override if available
+            const p = await fetchJSON("/api/random-player");
             bottomPill.innerHTML = `PASS TO: <span class="gold">${p.name}</span>`;
           }else{
             const c = await fetchJSON("/api/random-catch");
             bottomPill.innerHTML = `CATCH: <span class="gold">${c.catch}</span>`;
             if(String(c.catch).toUpperCase().includes("TOUCHDOWN")) playTD();
           }
-        }catch{
+        }catch(e){
           bottomPill.innerHTML = "<span class='gold'>ERROR</span>";
         }
 
@@ -410,7 +381,6 @@
     btnQB.onclick = () => spin("QB");
     btnReceiver.onclick = () => spin("Receiver");
 
-    // Initial image on load
     (async()=>{
       try{
         const d = await fetchJSON("/api/random-image?type=QB");

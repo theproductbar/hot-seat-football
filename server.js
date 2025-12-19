@@ -1,42 +1,87 @@
+require("dotenv").config();
 const express = require("express");
 const path = require("path");
 const fs = require("fs");
 const fetch = require("node-fetch");
 const csv = require("csv-parser");
 const { Readable } = require("stream");
-require("dotenv").config();
-
 const { google } = require("googleapis");
 
 const app = express();
-app.use(express.json()); // ✅ REQUIRED for POST/DELETE JSON body
 
-/* =========================
-   ENV helpers
-   ========================= */
+// ---------------------------
+// Middleware
+// ---------------------------
+app.use(express.json({ limit: "1mb" }));
+app.use(express.static(path.join(__dirname, "public")));
+
+// ---------------------------
+// Env helpers
+// ---------------------------
 function mustEnv(name) {
   const v = process.env[name];
   if (!v) throw new Error(`Missing env var: ${name}`);
   return v;
 }
 
+function getServiceAccountJSON() {
+  // Prefer base64 (safe for Vercel env UI)
+  const b64 = process.env.GOOGLE_SERVICE_ACCOUNT_JSON_B64;
+  if (b64 && b64.trim()) {
+    const raw = Buffer.from(b64.trim(), "base64").toString("utf-8");
+    return JSON.parse(raw);
+  }
+
+  // Fallback to raw JSON if you really want it locally
+  const raw = process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
+  if (raw && raw.trim()) return JSON.parse(raw);
+
+  throw new Error("Missing env var: GOOGLE_SERVICE_ACCOUNT_JSON_B64 (or GOOGLE_SERVICE_ACCOUNT_JSON)");
+}
+
 const PLAYERS_SHEET_ID = mustEnv("PLAYERS_SHEET_ID");
-const PLAYERS_TAB_NAME = mustEnv("PLAYERS_TAB_NAME");
-const RECEIVERS_SHEET_URL = mustEnv("RECEIVERS_SHEET_URL");
+const PLAYERS_TAB_NAME = mustEnv("PLAYERS_TAB_NAME"); // example: ReceiverPlayers
+const RECEIVERS_SHEET_URL = mustEnv("RECEIVERS_SHEET_URL"); // published CSV url to the OTHER sheet
 
-// If you use base64 env var
-const GOOGLE_SERVICE_ACCOUNT_JSON_B64 = process.env.GOOGLE_SERVICE_ACCOUNT_JSON_B64 || "";
-// Some older versions used GOOGLE_SERVICE_ACCOUNT_JSON
-const GOOGLE_SERVICE_ACCOUNT_JSON = process.env.GOOGLE_SERVICE_ACCOUNT_JSON || "";
+// ---------------------------
+// Google Sheets client
+// ---------------------------
+function sheetsClient() {
+  const sa = getServiceAccountJSON();
 
-/* =========================
-   Static files
-   ========================= */
-app.use(express.static(path.join(__dirname, "public")));
+  const auth = new google.auth.JWT({
+    email: sa.client_email,
+    key: sa.private_key,
+    scopes: ["https://www.googleapis.com/auth/spreadsheets"]
+  });
 
-/* =========================
-   Random Image (UNCHANGED)
-   ========================= */
+  return google.sheets({ version: "v4", auth });
+}
+
+// ---------------------------
+// Helper: read published CSV column (for Receiver catches)
+// ---------------------------
+async function readCSVColumnFromUrl(url, columnName) {
+  const r = await fetch(url);
+  if (!r.ok) throw new Error(`Failed to fetch CSV: ${r.status}`);
+
+  const text = await r.text();
+  const values = [];
+
+  return new Promise((resolve, reject) => {
+    Readable.from(text)
+      .pipe(csv())
+      .on("data", row => {
+        if (row[columnName]) values.push(String(row[columnName]).trim());
+      })
+      .on("end", () => resolve(values.filter(Boolean)))
+      .on("error", reject);
+  });
+}
+
+// ---------------------------
+// Random Image (QB/Receiver folders)
+// ---------------------------
 app.get("/api/random-image", (req, res) => {
   const type = (req.query.type || "QB").toLowerCase();
 
@@ -47,7 +92,7 @@ app.get("/api/random-image", (req, res) => {
 
   let files;
   try {
-    files = fs.readdirSync(folder).filter((f) => /\.(png|jpg|jpeg|webp)$/i.test(f));
+    files = fs.readdirSync(folder).filter(f => /\.(png|jpg|jpeg|webp)$/i.test(f));
   } catch {
     return res.status(500).json({ error: "Image folder not found" });
   }
@@ -56,261 +101,244 @@ app.get("/api/random-image", (req, res) => {
 
   const pick = files[Math.floor(Math.random() * files.length)];
   res.json({
-    url: `/images/${type === "receiver" ? "Receiver" : "QB"}/${pick}`,
+    url: `/images/${type === "receiver" ? "Receiver" : "QB"}/${pick}`
   });
 });
 
-/* =========================
-   CSV helper (Receivers sheet)
-   ========================= */
-async function readCSV(url, column) {
-  const res = await fetch(url);
-  if (!res.ok) throw new Error("Failed to fetch CSV");
-
-  const text = await res.text();
-  const values = [];
-
-  return new Promise((resolve, reject) => {
-    Readable.from(text)
-      .pipe(csv())
-      .on("data", (row) => {
-        if (row[column]) values.push(String(row[column]).trim());
-      })
-      .on("end", () => resolve(values))
-      .on("error", reject);
-  });
-}
-
-/* =========================
-   Google Sheets Admin (Players sheet)
-   ========================= */
-function getServiceAccountJSON() {
-  // Prefer base64 if present (best for .env and Vercel)
-  if (GOOGLE_SERVICE_ACCOUNT_JSON_B64) {
-    const decoded = Buffer.from(GOOGLE_SERVICE_ACCOUNT_JSON_B64, "base64").toString("utf-8");
-    return JSON.parse(decoded);
-  }
-  // Fallback: raw JSON string in env
-  if (GOOGLE_SERVICE_ACCOUNT_JSON) {
-    return JSON.parse(GOOGLE_SERVICE_ACCOUNT_JSON);
-  }
-  throw new Error("Missing env var: GOOGLE_SERVICE_ACCOUNT_JSON_B64 (or GOOGLE_SERVICE_ACCOUNT_JSON)");
-}
-
-function normName(s) {
-  return String(s || "")
-    .trim()
-    .replace(/\s+/g, " ")
-    .toLowerCase();
-}
-
-function isHeaderRow(val) {
-  return normName(val) === "name";
-}
-
-function getSheetsClient() {
-  const sa = getServiceAccountJSON();
-
-  const auth = new google.auth.JWT({
-    email: sa.client_email,
-    key: sa.private_key,
-    scopes: ["https://www.googleapis.com/auth/spreadsheets"],
-  });
-
-  return google.sheets({ version: "v4", auth });
-}
-
-// ✅ Prevent double-appends when two requests hit at same time
-let playersWriteLock = Promise.resolve();
-function withPlayersLock(fn) {
-  playersWriteLock = playersWriteLock.then(fn, fn);
-  return playersWriteLock;
-}
-
-async function getPlayersList(sheets) {
-  const range = `${PLAYERS_TAB_NAME}!A:A`;
-  const resp = await sheets.spreadsheets.values.get({
-    spreadsheetId: PLAYERS_SHEET_ID,
-    range,
-  });
-
-  const rows = resp.data.values || [];
-  const raw = rows.map((r) => (r && r[0] ? String(r[0]) : "")).filter(Boolean);
-
-  // Remove header + blanks
-  const cleaned = raw.filter((v) => !isHeaderRow(v) && normName(v));
-
-  return cleaned;
-}
-
-async function appendPlayerIfMissing(sheets, name) {
-  const clean = String(name || "").trim().replace(/\s+/g, " ");
-  const key = normName(clean);
-  if (!key) throw new Error("Missing name");
-
-  const existing = await getPlayersList(sheets);
-  const exists = existing.some((p) => normName(p) === key);
-
-  // ✅ If it already exists, DO NOT append again
-  if (exists) return { added: false, players: dedupe(existing) };
-
-  await sheets.spreadsheets.values.append({
-    spreadsheetId: PLAYERS_SHEET_ID,
-    range: `${PLAYERS_TAB_NAME}!A:A`,
-    valueInputOption: "RAW",
-    insertDataOption: "INSERT_ROWS",
-    requestBody: { values: [[clean]] },
-  });
-
-  const updated = await getPlayersList(sheets);
-  return { added: true, players: dedupe(updated) };
-}
-
-async function deletePlayerAllMatches(sheets, name) {
-  const clean = String(name || "").trim().replace(/\s+/g, " ");
-  const key = normName(clean);
-  if (!key) throw new Error("Missing name");
-
-  // Read all values with row indexes (A:A)
-  const range = `${PLAYERS_TAB_NAME}!A:A`;
-  const resp = await sheets.spreadsheets.values.get({
-    spreadsheetId: PLAYERS_SHEET_ID,
-    range,
-  });
-
-  const rows = resp.data.values || [];
-  // rows is 0-indexed array, but sheet rows are 1-indexed
-  const matches = [];
-  for (let i = 0; i < rows.length; i++) {
-    const v = rows[i]?.[0] ? String(rows[i][0]) : "";
-    if (!v) continue;
-    if (isHeaderRow(v)) continue;
-    if (normName(v) === key) {
-      matches.push(i + 1); // row number in sheet
-    }
-  }
-
-  if (!matches.length) return { deleted: 0 };
-
-  // Delete from bottom to top so row numbers stay valid
-  matches.sort((a, b) => b - a);
-
-  // Need sheetId (numeric) to do deleteDimension
-  const meta = await sheets.spreadsheets.get({ spreadsheetId: PLAYERS_SHEET_ID });
-  const sheet = (meta.data.sheets || []).find((s) => s.properties.title === PLAYERS_TAB_NAME);
-  if (!sheet) throw new Error(`Tab not found: ${PLAYERS_TAB_NAME}`);
-  const sheetId = sheet.properties.sheetId;
-
-  const requests = matches.map((rowNum) => ({
-    deleteDimension: {
-      range: {
-        sheetId,
-        dimension: "ROWS",
-        startIndex: rowNum - 1, // 0-indexed start
-        endIndex: rowNum,       // exclusive
-      },
-    },
-  }));
-
-  await sheets.spreadsheets.batchUpdate({
-    spreadsheetId: PLAYERS_SHEET_ID,
-    requestBody: { requests },
-  });
-
-  return { deleted: matches.length };
-}
-
-function dedupe(list) {
-  const seen = new Set();
-  const out = [];
-  for (const n of list) {
-    const k = normName(n);
-    if (!k) continue;
-    if (seen.has(k)) continue;
-    seen.add(k);
-    out.push(n);
-  }
-  return out;
-}
-
-/* =========================
-   Admin API (Players)
-   ========================= */
-app.get("/api/admin/receiver-players", async (req, res) => {
-  try {
-    const sheets = getSheetsClient();
-    const players = dedupe(await getPlayersList(sheets));
-    res.json({ players });
-  } catch (e) {
-    res.status(500).json({ error: e.message || "Failed to load players" });
-  }
-});
-
-app.post("/api/admin/receiver-players", async (req, res) => {
-  const name = req.body?.name;
-  try {
-    const result = await withPlayersLock(async () => {
-      const sheets = getSheetsClient();
-      return appendPlayerIfMissing(sheets, name);
-    });
-    res.json({ ok: true, added: result.added, players: result.players });
-  } catch (e) {
-    res.status(400).json({ error: e.message || "Failed to add" });
-  }
-});
-
-app.delete("/api/admin/receiver-players", async (req, res) => {
-  // accept either JSON body or query param as fallback
-  const name = req.body?.name || req.query?.name;
-
-  try {
-    const result = await withPlayersLock(async () => {
-      const sheets = getSheetsClient();
-      const del = await deletePlayerAllMatches(sheets, name);
-      const players = dedupe(await getPlayersList(sheets));
-      return { del, players };
-    });
-
-    res.json({ ok: true, deleted: result.del.deleted, players: result.players });
-  } catch (e) {
-    res.status(400).json({ error: e.message || "Failed to delete" });
-  }
-});
-
-/* =========================
-   Random Player (QB PASS) — uses Players sheet
-   ========================= */
+// ---------------------------
+// Game: Random Player (reads from Players sheet)
+// Column A header must be: name
+// ---------------------------
 app.get("/api/random-player", async (req, res) => {
   try {
-    const sheets = getSheetsClient();
-    const players = dedupe(await getPlayersList(sheets));
-    if (!players.length) return res.status(500).json({ error: "No players found" });
-    res.json({ name: players[Math.floor(Math.random() * players.length)] });
-  } catch (e) {
-    res.status(500).json({ error: "Failed to read players sheet", details: e.message });
+    const sheets = sheetsClient();
+
+    // Read column A (name). We include header row.
+    const range = `${PLAYERS_TAB_NAME}!A:A`;
+    const resp = await sheets.spreadsheets.values.get({
+      spreadsheetId: PLAYERS_SHEET_ID,
+      range
+    });
+
+    const rows = resp.data.values || [];
+    // Remove header if first cell is "name"
+    const names = rows
+      .map(r => (r && r[0] ? String(r[0]).trim() : ""))
+      .filter(Boolean);
+
+    const cleaned =
+      names.length && names[0].toLowerCase() === "name"
+        ? names.slice(1)
+        : names;
+
+    if (!cleaned.length) return res.status(500).json({ error: "No players found" });
+
+    res.json({ name: cleaned[Math.floor(Math.random() * cleaned.length)] });
+  } catch (err) {
+    res.status(500).json({ error: "Failed to read players sheet", details: err.message });
   }
 });
 
-/* =========================
-   Random Receiver Catch — uses RECEIVERS_SHEET_URL CSV (separate sheet)
-   ========================= */
+// ---------------------------
+// Game: Random Catch (Receiver sheet via published CSV URL)
+// Column header must be: catch
+// ---------------------------
 app.get("/api/random-catch", async (req, res) => {
   try {
-    const catches = await readCSV(RECEIVERS_SHEET_URL, "catch");
+    const catches = await readCSVColumnFromUrl(RECEIVERS_SHEET_URL, "catch");
     if (!catches.length) return res.status(500).json({ error: "No catches found" });
+
     res.json({ catch: catches[Math.floor(Math.random() * catches.length)] });
-  } catch (e) {
-    res.status(500).json({ error: "Failed to read receivers sheet", details: e.message });
+  } catch (err) {
+    res.status(500).json({ error: "Failed to read receivers sheet", details: err.message });
   }
 });
 
-/* =========================
-   Health check
-   ========================= */
+// ---------------------------
+// ADMIN API (Players) — Google Sheet write
+// ---------------------------
+
+// GET list
+app.get("/api/admin/receiver-players", async (req, res) => {
+  try {
+    const sheets = sheetsClient();
+    const range = `${PLAYERS_TAB_NAME}!A:A`;
+    const resp = await sheets.spreadsheets.values.get({
+      spreadsheetId: PLAYERS_SHEET_ID,
+      range
+    });
+
+    const rows = resp.data.values || [];
+    const names = rows
+      .map(r => (r && r[0] ? String(r[0]).trim() : ""))
+      .filter(Boolean);
+
+    const cleaned =
+      names.length && names[0].toLowerCase() === "name"
+        ? names.slice(1)
+        : names;
+
+    res.json({ players: cleaned });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST add (append)
+app.post("/api/admin/receiver-players", async (req, res) => {
+  try {
+    const name = String(req.body?.name || "").trim();
+    if (!name) return res.status(400).json({ error: "Missing name" });
+
+    const sheets = sheetsClient();
+
+    // Optional: prevent duplicate exact match by checking first
+    const range = `${PLAYERS_TAB_NAME}!A:A`;
+    const resp = await sheets.spreadsheets.values.get({
+      spreadsheetId: PLAYERS_SHEET_ID,
+      range
+    });
+
+    const rows = resp.data.values || [];
+    const names = rows
+      .map(r => (r && r[0] ? String(r[0]).trim() : ""))
+      .filter(Boolean);
+
+    const cleaned =
+      names.length && names[0].toLowerCase() === "name"
+        ? names.slice(1)
+        : names;
+
+    const exists = cleaned.some(n => n.toLowerCase() === name.toLowerCase());
+    if (exists) {
+      // Return current list (no write)
+      return res.json({ ok: true, players: cleaned });
+    }
+
+    await sheets.spreadsheets.values.append({
+      spreadsheetId: PLAYERS_SHEET_ID,
+      range: `${PLAYERS_TAB_NAME}!A:A`,
+      valueInputOption: "RAW",
+      insertDataOption: "INSERT_ROWS",
+      requestBody: { values: [[name]] }
+    });
+
+    // Return updated list
+    const resp2 = await sheets.spreadsheets.values.get({
+      spreadsheetId: PLAYERS_SHEET_ID,
+      range
+    });
+    const rows2 = resp2.data.values || [];
+    const names2 = rows2
+      .map(r => (r && r[0] ? String(r[0]).trim() : ""))
+      .filter(Boolean);
+
+    const cleaned2 =
+      names2.length && names2[0].toLowerCase() === "name"
+        ? names2.slice(1)
+        : names2;
+
+    res.json({ ok: true, players: cleaned2 });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// DELETE remove first match (case-insensitive)
+app.delete("/api/admin/receiver-players", async (req, res) => {
+  try {
+    const name = String(req.query?.name || "").trim();
+    if (!name) return res.status(400).json({ error: "Missing name" });
+
+    const sheets = sheetsClient();
+
+    // Read all names
+    const range = `${PLAYERS_TAB_NAME}!A:A`;
+    const resp = await sheets.spreadsheets.values.get({
+      spreadsheetId: PLAYERS_SHEET_ID,
+      range
+    });
+
+    const rows = resp.data.values || [];
+    // Find row index (1-based in Sheets). If header is row 1, data starts row 2.
+    // We scan including header; if header "name" exists, we skip it for matching.
+    let startRow = 1;
+    let offset = 0;
+
+    const firstCell = rows[0]?.[0] ? String(rows[0][0]).trim().toLowerCase() : "";
+    const hasHeader = firstCell === "name";
+    if (hasHeader) {
+      startRow = 2;
+      offset = 1;
+    }
+
+    const data = rows.slice(offset);
+    const idx = data.findIndex(r => String(r?.[0] || "").trim().toLowerCase() === name.toLowerCase());
+    if (idx === -1) {
+      // Not found; return current
+      const current = data.map(r => String(r?.[0] || "").trim()).filter(Boolean);
+      return res.json({ ok: true, players: current });
+    }
+
+    const rowNumberToDelete = startRow + idx; // sheet row number
+
+    // Delete that row using batchUpdate
+    const sheetMeta = await sheets.spreadsheets.get({
+      spreadsheetId: PLAYERS_SHEET_ID
+    });
+
+    const sheet = (sheetMeta.data.sheets || []).find(
+      s => s.properties?.title === PLAYERS_TAB_NAME
+    );
+    if (!sheet) throw new Error("Tab not found: " + PLAYERS_TAB_NAME);
+
+    const sheetId = sheet.properties.sheetId;
+
+    await sheets.spreadsheets.batchUpdate({
+      spreadsheetId: PLAYERS_SHEET_ID,
+      requestBody: {
+        requests: [
+          {
+            deleteDimension: {
+              range: {
+                sheetId,
+                dimension: "ROWS",
+                startIndex: rowNumberToDelete - 1, // 0-based inclusive
+                endIndex: rowNumberToDelete // 0-based exclusive
+              }
+            }
+          }
+        ]
+      }
+    });
+
+    // Return updated list
+    const resp2 = await sheets.spreadsheets.values.get({
+      spreadsheetId: PLAYERS_SHEET_ID,
+      range
+    });
+
+    const rows2 = resp2.data.values || [];
+    const names2 = rows2
+      .slice(hasHeader ? 1 : 0)
+      .map(r => String(r?.[0] || "").trim())
+      .filter(Boolean);
+
+    res.json({ ok: true, players: names2 });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ---------------------------
+// Health
+// ---------------------------
 app.get("/api/health", (_, res) => res.json({ ok: true }));
 
-/* =========================
-   Start server
-   ========================= */
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Server running on http://localhost:${PORT}`));
+module.exports = app;
+
+// Local only
+if (require.main === module) {
+  const PORT = process.env.PORT || 3000;
+  app.listen(PORT, () => console.log(`Local server running on http://localhost:${PORT}`));
+}
