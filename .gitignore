@@ -2,7 +2,4 @@ node_modules
 .env
 .env.*
 *.json
-.DS_Store.env
-*.json
-.env
-*.json
+.DS_Store

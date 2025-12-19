@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8"/>
+  <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
   <title>Receiver Players Admin</title>
   <style>
@@ -11,98 +11,101 @@
       background:#000;
       color:#fff;
       font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
-      display:flex; justify-content:center; align-items:flex-start;
+      display:flex;
+      justify-content:center;
+      align-items:center;
       padding:24px;
     }
     .card{
-      width:min(980px, 96vw);
-      margin-top:18px;
+      width:min(1100px,96vw);
+      background:linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.02));
+      border:1px solid rgba(255,255,255,.12);
       border-radius:28px;
-      background:rgba(255,255,255,0.06);
-      border:1px solid rgba(255,255,255,0.12);
-      box-shadow:0 20px 80px rgba(0,0,0,0.75);
-      backdrop-filter: blur(14px);
-      padding:26px;
+      padding:28px;
+      box-shadow:0 24px 80px rgba(0,0,0,.65);
     }
     .top{
-      display:flex; align-items:flex-start; justify-content:space-between; gap:16px;
+      display:flex;
+      align-items:flex-start;
+      justify-content:space-between;
+      gap:16px;
+      margin-bottom:18px;
     }
     h1{
-      font-size:18px;
-      letter-spacing:0.28em;
+      font-size:22px;
+      letter-spacing:.26em;
       text-transform:uppercase;
       font-weight:900;
-      margin-bottom:10px;
     }
-    .sub{opacity:.8; margin-bottom:16px}
-    .btnBack{
-      display:inline-block;
+    .sub{opacity:.75;margin-top:8px}
+    .back{
       text-decoration:none;
       color:#fff;
-      border:1px solid rgba(255,255,255,0.18);
+      opacity:.85;
+      font-size:12px;
+      letter-spacing:.18em;
+      text-transform:uppercase;
       padding:10px 14px;
       border-radius:999px;
-      letter-spacing:0.18em;
-      text-transform:uppercase;
-      font-size:12px;
-      background:rgba(0,0,0,0.35);
+      border:1px solid rgba(255,255,255,.18);
+      background:rgba(0,0,0,.35);
     }
     .row{
-      display:flex; gap:12px; align-items:center; margin-top:14px;
-      flex-wrap:wrap;
+      display:flex;
+      gap:14px;
+      align-items:center;
+      margin:18px 0 14px;
     }
     input{
-      flex:1 1 420px;
-      min-width:260px;
-      padding:16px 18px;
+      flex:1;
+      min-width:220px;
+      padding:18px 18px;
       border-radius:999px;
-      border:1px solid rgba(255,255,255,0.16);
-      outline:none;
-      background:rgba(0,0,0,0.35);
+      border:1px solid rgba(255,255,255,.14);
+      background:rgba(0,0,0,.35);
       color:#fff;
-      font-size:16px;
+      font-size:18px;
+      outline:none;
     }
-    .btn{
-      padding:16px 22px;
+    button{
+      padding:16px 26px;
       border-radius:999px;
       border:none;
       cursor:pointer;
       font-weight:900;
-      letter-spacing:0.14em;
+      letter-spacing:.16em;
       text-transform:uppercase;
-      font-size:13px;
-      background:rgba(255,255,255,0.18);
+      background:rgba(255,255,255,.16);
       color:#fff;
     }
-    .btnPrimary{ background:#facc15; color:#000; }
-    .btn:disabled{opacity:.45; cursor:not-allowed}
-    .err{ color:#ff6b6b; margin-top:10px; min-height:22px }
+    button.primary{ background:#facc15; color:#000; }
+    button:disabled{ opacity:.45; cursor:not-allowed; }
+    .err{ color:#ff6b6b; margin:10px 0 0; min-height:22px; }
     .list{
-      margin-top:16px;
-      border-top:1px solid rgba(255,255,255,0.12);
+      margin-top:18px;
+      border-top:1px solid rgba(255,255,255,.10);
     }
     .item{
-      display:flex; justify-content:space-between; align-items:center;
-      padding:18px 6px;
-      border-bottom:1px solid rgba(255,255,255,0.10);
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      padding:18px 4px;
+      border-bottom:1px solid rgba(255,255,255,.10);
     }
-    .name{
-      font-size:22px;
-      font-weight:800;
-      letter-spacing:.02em;
-    }
+    .name{ font-size:26px; font-weight:900; }
     .xbtn{
-      width:44px; height:44px;
-      border-radius:14px;
-      border:1px solid rgba(255,255,255,0.18);
-      background:rgba(0,0,0,0.35);
-      color:#fff;
-      font-size:22px;
-      cursor:pointer;
+      width:56px;height:56px;
+      border-radius:16px;
+      display:flex;align-items:center;justify-content:center;
+      background:rgba(0,0,0,.35);
+      border:1px solid rgba(255,255,255,.16);
+      font-size:26px;
+      font-weight:900;
+      line-height:1;
     }
-    .xbtn:disabled{opacity:.45; cursor:not-allowed}
   </style>
 </head>
+
 <body>
   <div class="card">
     <div class="top">
@@ -110,135 +113,133 @@
         <h1>Receiver Players Admin</h1>
         <div class="sub">Add/remove players before the game. (Updates Google Sheet.)</div>
       </div>
-      <a class="btnBack" href="/">Back</a>
+      <a class="back" href="/">Back</a>
     </div>
 
     <div class="row">
-      <input id="nameInput" placeholder="Add player name..." autocomplete="off"/>
-      <button id="addBtn" class="btn btnPrimary">Add</button>
-      <button id="refreshBtn" class="btn">Refresh</button>
+      <input id="nameInput" placeholder="Add player name..." autocomplete="off" />
+      <button class="primary" id="addBtn">Add</button>
+      <button id="refreshBtn">Refresh</button>
     </div>
 
-    <div id="err" class="err"></div>
+    <div class="err" id="err"></div>
 
-    <div id="list" class="list"></div>
+    <div class="list" id="list"></div>
   </div>
 
-<script>
-  const listEl = document.getElementById("list");
-  const errEl = document.getElementById("err");
-  const nameInput = document.getElementById("nameInput");
-  const addBtn = document.getElementById("addBtn");
-  const refreshBtn = document.getElementById("refreshBtn");
+  <script>
+    const errEl = document.getElementById("err");
+    const listEl = document.getElementById("list");
+    const input = document.getElementById("nameInput");
+    const addBtn = document.getElementById("addBtn");
+    const refreshBtn = document.getElementById("refreshBtn");
 
-  function setError(msg){ errEl.textContent = msg || ""; }
+    let busy = false;
 
-  async function fetchJSON(url, opts){
-    const r = await fetch(url, opts);
-    const text = await r.text();
-    let data = null;
-    try { data = text ? JSON.parse(text) : null; } catch {}
-    if(!r.ok){
-      const e = (data && data.error) ? data.error : text || "Request failed";
-      throw new Error(e);
-    }
-    return data;
-  }
+    function setError(msg){ errEl.textContent = msg || ""; }
 
-  function render(players){
-    listEl.innerHTML = "";
-    const seen = new Set();
-
-    // UI safeguard: show unique names only
-    const unique = [];
-    for(const p of (players || [])){
-      const key = String(p || "").trim().toLowerCase();
-      if(!key) continue;
-      if(seen.has(key)) continue;
-      seen.add(key);
-      unique.push(String(p).trim());
+    async function api(url, opts){
+      const r = await fetch(url, opts);
+      const text = await r.text();
+      let data;
+      try { data = JSON.parse(text); } catch { data = { error: text }; }
+      if(!r.ok) throw new Error(data.error || "Request failed");
+      return data;
     }
 
-    unique.forEach(name => {
-      const row = document.createElement("div");
-      row.className = "item";
+    function render(players){
+      listEl.innerHTML = "";
+      (players || []).forEach(name => {
+        const row = document.createElement("div");
+        row.className = "item";
 
-      const n = document.createElement("div");
-      n.className = "name";
-      n.textContent = name;
+        const n = document.createElement("div");
+        n.className = "name";
+        n.textContent = name;
 
-      const x = document.createElement("button");
-      x.className = "xbtn";
-      x.textContent = "×";
-      x.onclick = () => removeName(name, x);
+        const x = document.createElement("button");
+        x.className = "xbtn";
+        x.textContent = "×";
+        x.onclick = () => remove(name);
 
-      row.appendChild(n);
-      row.appendChild(x);
-      listEl.appendChild(row);
-    });
-  }
-
-  async function load(){
-    setError("");
-    try{
-      const d = await fetchJSON("/api/admin/receiver-players");
-      render(d.players);
-    }catch(e){
-      setError("Load failed: " + e.message);
-    }
-  }
-
-  async function add(){
-    const name = nameInput.value.trim();
-    if(!name){ setError("Error: Missing name"); return; }
-
-    setError("");
-    addBtn.disabled = true;
-    refreshBtn.disabled = true;
-
-    try{
-      const d = await fetchJSON("/api/admin/receiver-players", {
-        method: "POST",
-        headers: { "Content-Type":"application/json" },
-        body: JSON.stringify({ name })
+        row.appendChild(n);
+        row.appendChild(x);
+        listEl.appendChild(row);
       });
-      nameInput.value = "";
-      render(d.players);
-    }catch(e){
-      setError("Error: " + e.message);
-    }finally{
-      addBtn.disabled = false;
-      refreshBtn.disabled = false;
     }
-  }
 
-  async function removeName(name, btn){
-    if(!name){ setError("Error: Missing name"); return; }
-
-    setError("");
-    btn.disabled = true;
-    addBtn.disabled = true;
-    refreshBtn.disabled = true;
-
-    try{
-      const d = await fetchJSON("/api/admin/receiver-players?name=" + encodeURIComponent(name), {
-        method: "DELETE"
-      });
-      render(d.players);
-    }catch(e){
-      setError("Error: " + e.message);
-    }finally{
-      btn.disabled = false;
-      addBtn.disabled = false;
-      refreshBtn.disabled = false;
+    async function load(){
+      setError("");
+      try{
+        const d = await api("/api/admin/receiver-players");
+        render(d.players);
+      }catch(e){
+        setError("Load failed: " + e.message);
+      }
     }
-  }
 
-  addBtn.onclick = add;
-  refreshBtn.onclick = load;
-  nameInput.addEventListener("keydown", (e)=>{ if(e.key==="Enter") add(); });
+    async function add(){
+      const name = input.value.trim();
+      if(!name){ setError("Error: Missing name"); return; }
+      if(busy) return;
 
-  load();
-</script>
+      busy = true;
+      addBtn.disabled = true;
+      refreshBtn.disabled = true;
+      setError("");
+
+      try{
+        const d = await api("/api/admin/receiver-players", {
+          method:"POST",
+          headers:{ "Content-Type":"application/json" },
+          body: JSON.stringify({ name })
+        });
+
+        // render sheet result (authoritative)
+        render(d.players);
+        input.value = "";
+        input.focus();
+      }catch(e){
+        setError("Add failed: " + e.message);
+      }finally{
+        busy = false;
+        addBtn.disabled = false;
+        refreshBtn.disabled = false;
+      }
+    }
+
+    async function remove(name){
+      if(!name){ setError("Error: Missing name"); return; }
+      if(busy) return;
+
+      busy = true;
+      addBtn.disabled = true;
+      refreshBtn.disabled = true;
+      setError("");
+
+      try{
+        const d = await api("/api/admin/receiver-players", {
+          method:"DELETE",
+          headers:{ "Content-Type":"application/json" },
+          body: JSON.stringify({ name })
+        });
+
+        // render sheet result (authoritative)
+        render(d.players);
+      }catch(e){
+        setError("Delete failed: " + e.message);
+      }finally{
+        busy = false;
+        addBtn.disabled = false;
+        refreshBtn.disabled = false;
+      }
+    }
+
+    addBtn.onclick = add;
+    refreshBtn.onclick = load;
+    input.addEventListener("keydown", (e)=>{ if(e.key==="Enter") add(); });
+
+    load();
+  </script>
 </body>
 </html>

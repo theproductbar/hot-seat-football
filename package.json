@@ -3,15 +3,17 @@
   "version": "1.0.0",
   "private": true,
   "type": "commonjs",
-  "main": "server.js",
+  "engines": {
+    "node": ">=18"
+  },
   "scripts": {
+    "dev": "node server.js",
     "start": "node server.js"
   },
   "dependencies": {
-    "csv-parser": "^3.0.0",
-    "dotenv": "^17.2.3",
+    "csv-parser": "^3.2.0",
     "express": "^4.19.2",
-    "googleapis": "^144.0.0",
-    "node-fetch": "^2.7.0"
+    "googleapis": "^140.0.0",
+    "dotenv": "^17.2.3"
   }
 }
