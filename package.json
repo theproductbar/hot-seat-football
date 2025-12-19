@@ -1,19 +1,14 @@
 {
   "name": "hot-seat-football",
   "version": "1.0.0",
-  "private": true,
   "type": "commonjs",
-  "engines": {
-    "node": ">=18"
-  },
   "scripts": {
-    "dev": "node server.js",
-    "start": "node server.js"
+    "dev": "node server.js"
   },
-  "dependencies": {
-    "csv-parser": "^3.2.0",
-    "express": "^4.19.2",
-    "googleapis": "^140.0.0",
-    "dotenv": "^17.2.3"
-  }
+"dependencies": {
+  "express": "^4.19.2",
+  "dotenv": "^16.4.5",
+  "csv-parser": "^3.2.0",
+  "googleapis": "^144.0.0"
+}
 }
