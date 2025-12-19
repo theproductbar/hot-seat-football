@@ -33,54 +33,71 @@
     }
 
     /* =========================
-       ✅ TOP BAR (MOBILE SAFE)
+       ✅ NEW: Top controls row (toggle left + admin right)
        ========================= */
-    .topBar{
+    .topControls{
       position:absolute;
       top: calc(12px + env(safe-area-inset-top));
       left: 0;
       right: 0;
-      z-index: 130;
-
+      z-index: 120;
       display:flex;
       align-items:center;
       justify-content:space-between;
-      gap: 10px;
-
-      padding:
-        0 calc(12px + env(safe-area-inset-right))
-        0 calc(12px + env(safe-area-inset-left));
-
-      pointer-events:none; /* only pills/links clickable */
+      padding: 0 calc(12px + env(safe-area-inset-left)) 0 calc(12px + env(safe-area-inset-right));
+      pointer-events:none; /* only the buttons inside should be clickable */
     }
+    .topControls > *{ pointer-events:auto; }
 
-    .topTitle{
-      pointer-events:none;
-      font-weight:900;
-      letter-spacing:0.22em;
-      text-transform:uppercase;
-      font-size:14px;
-      padding:10px 16px;
+    /* Toggle pill */
+    .sbPill{
+      display:flex;
+      align-items:center;
+      gap:10px;
+      padding:10px 14px;
       border-radius:999px;
-      background:rgba(0,0,0,0.65);
-      backdrop-filter:blur(10px);
-      box-shadow:0 12px 40px rgba(0,0,0,0.6);
+      background:rgba(0,0,0,0.45);
+      border:1px solid rgba(255,255,255,0.14);
+      backdrop-filter: blur(10px);
+      box-shadow:0 10px 30px rgba(0,0,0,0.55);
+      user-select:none;
+    }
+    .sbLabel{
+      font-size:12px;
+      letter-spacing:0.18em;
+      text-transform:uppercase;
+      color:rgba(255,255,255,0.85);
       white-space:nowrap;
-
-      /* ✅ prevents overlap; title shrinks on small screens */
-      max-width: 44vw;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      text-align:center;
     }
 
-    /* =========================
-       ✅ ADMIN button (always visible)
-       ========================= */
+    .switch{
+      position:relative;
+      width:56px;
+      height:30px;
+      border-radius:999px;
+      background:rgba(255,255,255,0.18);
+      border:1px solid rgba(255,255,255,0.18);
+      cursor:pointer;
+      flex:0 0 auto;
+    }
+    .knob{
+      position:absolute;
+      top:3px;
+      left:3px;
+      width:24px;
+      height:24px;
+      border-radius:50%;
+      background:#fff;
+      transition:transform .18s ease;
+    }
+    .switch.on .knob{
+      transform:translateX(26px);
+    }
+
+    /* Admin link pill */
     .adminLink{
-      pointer-events:auto;
-      font-size:11px;
-      letter-spacing:0.14em;
+      font-size:12px;
+      letter-spacing:0.18em;
       text-transform:uppercase;
       padding:10px 14px;
       border-radius:999px;
@@ -97,69 +114,30 @@
     .adminLink:active{ transform: translateY(1px); }
 
     /* =========================
-       ✅ SUPERBOWL toggle pill (left)
+       ✅ Title moved to SECOND ROW (centered, never overlaps)
        ========================= */
-    .sbPill{
-      pointer-events:auto;
-      display:flex;
-      align-items:center;
-      gap:10px;
-      padding:10px 14px;
-      border-radius:999px;
-      background:rgba(0,0,0,0.45);
-      border:1px solid rgba(255,255,255,0.14);
-      backdrop-filter: blur(10px);
-      box-shadow:0 10px 30px rgba(0,0,0,0.55);
-      white-space:nowrap;
-    }
-    .sbLabel{
-      font-size:11px;
-      letter-spacing:0.14em;
+    .topTitle{
+      position:absolute;
+      top: calc(60px + env(safe-area-inset-top)); /* second row */
+      left:50%;
+      transform:translateX(-50%);
+      z-index:110;
+      font-weight:900;
+      letter-spacing:0.22em;
       text-transform:uppercase;
-      color:rgba(255,255,255,0.88);
-    }
-
-    /* Toggle switch */
-    .switch{
-      position:relative;
-      width:48px;
-      height:28px;
-      display:inline-block;
-    }
-    .switch input{ display:none; }
-    .slider{
-      position:absolute;
-      cursor:pointer;
-      inset:0;
-      background:rgba(255,255,255,0.20);
-      border:1px solid rgba(255,255,255,0.16);
-      transition:.2s;
+      font-size:14px;
+      padding:10px 18px;
       border-radius:999px;
-    }
-    .slider:before{
-      content:"";
-      position:absolute;
-      height:22px;
-      width:22px;
-      left:3px;
-      top:50%;
-      transform:translateY(-50%);
-      background:#fff;
-      border-radius:50%;
-      transition:.2s;
-      box-shadow: 0 8px 20px rgba(0,0,0,0.5);
-    }
-    .switch input:checked + .slider{
-      background: rgba(250,204,21,0.55);
-      border-color: rgba(250,204,21,0.35);
-    }
-    .switch input:checked + .slider:before{
-      transform:translate(20px,-50%);
+      background:rgba(0,0,0,0.65);
+      backdrop-filter:blur(10px);
+      box-shadow:0 12px 40px rgba(0,0,0,0.6);
+      pointer-events:none;
+      white-space:nowrap;
+      max-width: 86vw;             /* prevent clipping */
+      overflow:hidden;
+      text-overflow:ellipsis;      /* nice fallback on tiny screens */
     }
 
-    /* =========================
-       Main image + overlays
-       ========================= */
     #image{
       max-width:100vw;
       max-height:100vh;
@@ -261,7 +239,6 @@
 
     .disabled{ opacity:.35; pointer-events:none; }
 
-    /* Touchdown Flash */
     .flash{
       position:absolute;
       inset:0;
@@ -308,20 +285,20 @@
 <body>
   <div class="stage">
 
-    <!-- ✅ TOP BAR -->
-    <div class="topBar">
-      <div class="sbPill">
-        <span class="sbLabel">SUPERBOWL</span>
-        <label class="switch" title="Superbowl Mode">
-          <input id="sbToggle" type="checkbox">
-          <span class="slider"></span>
-        </label>
+    <!-- ✅ Top row -->
+    <div class="topControls">
+      <div class="sbPill" id="sbPill">
+        <div class="sbLabel">Superbowl</div>
+        <div class="switch" id="sbSwitch" role="switch" aria-checked="false">
+          <div class="knob"></div>
+        </div>
       </div>
-
-      <div class="topTitle">Zone Madness</div>
 
       <a class="adminLink" href="/admin.html">ADMIN</a>
     </div>
+
+    <!-- ✅ Second row title -->
+    <div class="topTitle">Zone Madness</div>
 
     <img id="image" alt="">
     <div class="veil"></div>
@@ -341,7 +318,6 @@
   </div>
 
   <div id="tdFlash"></div>
-
   <audio id="tdAudio" preload="auto" src="/sounds/td-crowd.mp3"></audio>
 
   <script>
@@ -360,13 +336,27 @@
     const btnQB = document.getElementById("btnQB");
     const btnReceiver = document.getElementById("btnReceiver");
 
-    const sbToggle = document.getElementById("sbToggle");
-    const SB_KEY = "SB_MODE_ON";
+    // ✅ SB toggle UI + state (stored)
+    const sbSwitch = document.getElementById("sbSwitch");
+    let sbMode = localStorage.getItem("SB_MODE") === "1";
 
-    // load toggle state
-    sbToggle.checked = localStorage.getItem(SB_KEY) === "1";
-    sbToggle.addEventListener("change", () => {
-      localStorage.setItem(SB_KEY, sbToggle.checked ? "1" : "0");
+    function paintSB(){
+      sbSwitch.classList.toggle("on", sbMode);
+      sbSwitch.setAttribute("aria-checked", sbMode ? "true" : "false");
+    }
+    paintSB();
+
+    function toggleSB(){
+      sbMode = !sbMode;
+      localStorage.setItem("SB_MODE", sbMode ? "1" : "0");
+      paintSB();
+    }
+    sbSwitch.addEventListener("click", toggleSB);
+    // Allow tapping the whole pill
+    document.getElementById("sbPill").addEventListener("click", (e) => {
+      // avoid double toggle if click hit the switch itself
+      if (e.target === sbSwitch || sbSwitch.contains(e.target)) return;
+      toggleSB();
     });
 
     let spinning = false, spinInterval = null;
@@ -383,14 +373,15 @@
       btnReceiver.classList.toggle("disabled", d);
     }
 
-    // Unlock audio silently
     let audioUnlocked = false;
     function unlockAudioOnce(){
       if (audioUnlocked) return;
       audioUnlocked = true;
+
       try{
         tdAudio.volume = 0;
         tdAudio.muted = true;
+
         const p = tdAudio.play();
         if (p && p.then){
           p.then(()=>{
@@ -410,8 +401,10 @@
       try{
         tdAudio.pause();
         tdAudio.currentTime = 0;
+
         tdAudio.muted = false;
         tdAudio.volume = 1;
+
         const p = tdAudio.play();
         if (p && p.catch) p.catch(()=>{});
       }catch{}
@@ -467,8 +460,9 @@
             const p = await fetchJSON("/api/random-player");
             bottomPill.innerHTML = `PASS TO: <span class="gold">${p.name}</span>`;
           }else{
-            const mode = sbToggle.checked ? "sb" : "normal";
-            const c = await fetchJSON(`/api/random-catch?mode=${mode}`);
+            // ✅ SB mode affects receiver only
+            const modeParam = sbMode ? "sb" : "normal";
+            const c = await fetchJSON(`/api/random-catch?mode=${modeParam}`);
             bottomPill.innerHTML = `CATCH: <span class="gold">${c.catch}</span>`;
             if(String(c.catch).toUpperCase().includes("TOUCHDOWN")) playTD();
           }
@@ -486,7 +480,6 @@
     btnQB.onclick = () => spin("QB");
     btnReceiver.onclick = () => spin("Receiver");
 
-    // Initial image on load
     (async()=>{
       try{
         const d = await fetchJSON("/api/random-image?type=QB");
