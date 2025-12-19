@@ -1,245 +1,95 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
-  <title>Receiver Players Admin</title>
-  <style>
-    *{box-sizing:border-box;margin:0;padding:0}
-    body{
-      min-height:100svh;
-      background:#000;
-      color:#fff;
-      font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
-      display:flex;
-      justify-content:center;
-      align-items:center;
-      padding:24px;
-    }
-    .card{
-      width:min(1100px,96vw);
-      background:linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.02));
-      border:1px solid rgba(255,255,255,.12);
-      border-radius:28px;
-      padding:28px;
-      box-shadow:0 24px 80px rgba(0,0,0,.65);
-    }
-    .top{
-      display:flex;
-      align-items:flex-start;
-      justify-content:space-between;
-      gap:16px;
-      margin-bottom:18px;
-    }
-    h1{
-      font-size:22px;
-      letter-spacing:.26em;
-      text-transform:uppercase;
-      font-weight:900;
-    }
-    .sub{opacity:.75;margin-top:8px}
-    .back{
-      text-decoration:none;
-      color:#fff;
-      opacity:.85;
-      font-size:12px;
-      letter-spacing:.18em;
-      text-transform:uppercase;
-      padding:10px 14px;
-      border-radius:999px;
-      border:1px solid rgba(255,255,255,.18);
-      background:rgba(0,0,0,.35);
-    }
-    .row{
-      display:flex;
-      gap:14px;
-      align-items:center;
-      margin:18px 0 14px;
-    }
-    input{
-      flex:1;
-      min-width:220px;
-      padding:18px 18px;
-      border-radius:999px;
-      border:1px solid rgba(255,255,255,.14);
-      background:rgba(0,0,0,.35);
-      color:#fff;
-      font-size:18px;
-      outline:none;
-    }
-    button{
-      padding:16px 26px;
-      border-radius:999px;
-      border:none;
-      cursor:pointer;
-      font-weight:900;
-      letter-spacing:.16em;
-      text-transform:uppercase;
-      background:rgba(255,255,255,.16);
-      color:#fff;
-    }
-    button.primary{ background:#facc15; color:#000; }
-    button:disabled{ opacity:.45; cursor:not-allowed; }
-    .err{ color:#ff6b6b; margin:10px 0 0; min-height:22px; }
-    .list{
-      margin-top:18px;
-      border-top:1px solid rgba(255,255,255,.10);
-    }
-    .item{
-      display:flex;
-      justify-content:space-between;
-      align-items:center;
-      padding:18px 4px;
-      border-bottom:1px solid rgba(255,255,255,.10);
-    }
-    .name{ font-size:26px; font-weight:900; }
-    .xbtn{
-      width:56px;height:56px;
-      border-radius:16px;
-      display:flex;align-items:center;justify-content:center;
-      background:rgba(0,0,0,.35);
-      border:1px solid rgba(255,255,255,.16);
-      font-size:26px;
-      font-weight:900;
-      line-height:1;
-    }
-  </style>
-</head>
+<script>
+  const $ = (id) => document.getElementById(id);
 
-<body>
-  <div class="card">
-    <div class="top">
-      <div>
-        <h1>Receiver Players Admin</h1>
-        <div class="sub">Add/remove players before the game. (Updates Google Sheet.)</div>
-      </div>
-      <a class="back" href="/">Back</a>
-    </div>
+  const input = $("playerInput");
+  const addBtn = $("addBtn");
+  const refreshBtn = $("refreshBtn");
+  const list = $("playersList");
+  const msg = $("msg");
 
-    <div class="row">
-      <input id="nameInput" placeholder="Add player name..." autocomplete="off" />
-      <button class="primary" id="addBtn">Add</button>
-      <button id="refreshBtn">Refresh</button>
-    </div>
+  function setMsg(text, isError=false){
+    msg.textContent = text || "";
+    msg.style.color = isError ? "#ff5a5a" : "#9cff9c";
+  }
 
-    <div class="err" id="err"></div>
+  async function api(path, opts){
+    const r = await fetch(path, opts);
+    const text = await r.text();
+    let data;
+    try { data = JSON.parse(text); }
+    catch { throw new Error(text || "Bad response"); }
+    if(!r.ok) throw new Error(data.error || data.details || "Request failed");
+    return data;
+  }
 
-    <div class="list" id="list"></div>
-  </div>
+  function render(players){
+    list.innerHTML = "";
+    players.forEach((name) => {
+      const row = document.createElement("div");
+      row.className = "row";
 
-  <script>
-    const errEl = document.getElementById("err");
-    const listEl = document.getElementById("list");
-    const input = document.getElementById("nameInput");
-    const addBtn = document.getElementById("addBtn");
-    const refreshBtn = document.getElementById("refreshBtn");
+      const label = document.createElement("div");
+      label.className = "name";
+      label.textContent = name;
 
-    let busy = false;
+      const del = document.createElement("button");
+      del.className = "del";
+      del.textContent = "×";
+      del.onclick = async () => {
+        try{
+          del.disabled = true;
+          setMsg("");
+          const data = await api("/api/admin/receiver-players", {
+            method: "DELETE",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ name })
+          });
+          render(data.players || []);
+        }catch(e){
+          setMsg("Error: " + e.message, true);
+        }finally{
+          del.disabled = false;
+        }
+      };
 
-    function setError(msg){ errEl.textContent = msg || ""; }
+      row.appendChild(label);
+      row.appendChild(del);
+      list.appendChild(row);
+    });
+  }
 
-    async function api(url, opts){
-      const r = await fetch(url, opts);
-      const text = await r.text();
-      let data;
-      try { data = JSON.parse(text); } catch { data = { error: text }; }
-      if(!r.ok) throw new Error(data.error || "Request failed");
-      return data;
+  async function load(){
+    try{
+      setMsg("");
+      const data = await api("/api/admin/receiver-players");
+      render(data.players || []);
+    }catch(e){
+      setMsg("Load failed: " + e.message, true);
     }
+  }
 
-    function render(players){
-      listEl.innerHTML = "";
-      (players || []).forEach(name => {
-        const row = document.createElement("div");
-        row.className = "item";
+  addBtn.onclick = async () => {
+    const name = (input.value || "").trim();
+    if(!name) return setMsg("Error: Missing name", true);
 
-        const n = document.createElement("div");
-        n.className = "name";
-        n.textContent = name;
-
-        const x = document.createElement("button");
-        x.className = "xbtn";
-        x.textContent = "×";
-        x.onclick = () => remove(name);
-
-        row.appendChild(n);
-        row.appendChild(x);
-        listEl.appendChild(row);
+    try{
+      addBtn.disabled = true;
+      setMsg("");
+      const data = await api("/api/admin/receiver-players", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name })
       });
+      input.value = "";
+      render(data.players || []);
+    }catch(e){
+      setMsg("Error: " + e.message, true);
+    }finally{
+      addBtn.disabled = false;
     }
+  };
 
-    async function load(){
-      setError("");
-      try{
-        const d = await api("/api/admin/receiver-players");
-        render(d.players);
-      }catch(e){
-        setError("Load failed: " + e.message);
-      }
-    }
+  refreshBtn.onclick = load;
 
-    async function add(){
-      const name = input.value.trim();
-      if(!name){ setError("Error: Missing name"); return; }
-      if(busy) return;
-
-      busy = true;
-      addBtn.disabled = true;
-      refreshBtn.disabled = true;
-      setError("");
-
-      try{
-        const d = await api("/api/admin/receiver-players", {
-          method:"POST",
-          headers:{ "Content-Type":"application/json" },
-          body: JSON.stringify({ name })
-        });
-
-        // render sheet result (authoritative)
-        render(d.players);
-        input.value = "";
-        input.focus();
-      }catch(e){
-        setError("Add failed: " + e.message);
-      }finally{
-        busy = false;
-        addBtn.disabled = false;
-        refreshBtn.disabled = false;
-      }
-    }
-
-    async function remove(name){
-      if(!name){ setError("Error: Missing name"); return; }
-      if(busy) return;
-
-      busy = true;
-      addBtn.disabled = true;
-      refreshBtn.disabled = true;
-      setError("");
-
-      try{
-        const d = await api("/api/admin/receiver-players", {
-          method:"DELETE",
-          headers:{ "Content-Type":"application/json" },
-          body: JSON.stringify({ name })
-        });
-
-        // render sheet result (authoritative)
-        render(d.players);
-      }catch(e){
-        setError("Delete failed: " + e.message);
-      }finally{
-        busy = false;
-        addBtn.disabled = false;
-        refreshBtn.disabled = false;
-      }
-    }
-
-    addBtn.onclick = add;
-    refreshBtn.onclick = load;
-    input.addEventListener("keydown", (e)=>{ if(e.key==="Enter") add(); });
-
-    load();
-  </script>
-</body>
-</html>
+  load();
+</script>
