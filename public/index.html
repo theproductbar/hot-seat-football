@@ -33,111 +33,127 @@
     }
 
     /* =========================
-       ✅ NEW: Top controls row (toggle left + admin right)
+       ✅ NEW: TOP HUD (Row 1 + Row 2)
+       Row 1: Superbowl toggle (left) + Admin (right)
+       Row 2: Title (center)
        ========================= */
-    .topControls{
+    .top-hud{
       position:absolute;
-      top: calc(12px + env(safe-area-inset-top));
+      top: calc(10px + env(safe-area-inset-top));
       left: 0;
       right: 0;
-      z-index: 120;
-      display:flex;
-      align-items:center;
-      justify-content:space-between;
-      padding: 0 calc(12px + env(safe-area-inset-left)) 0 calc(12px + env(safe-area-inset-right));
-      pointer-events:none; /* only the buttons inside should be clickable */
+      z-index: 200;
+      padding: 0 calc(12px + env(safe-area-inset-right)) 0 calc(12px + env(safe-area-inset-left));
+      pointer-events: none; /* so image taps still work */
     }
-    .topControls > *{ pointer-events:auto; }
 
-    /* Toggle pill */
-    .sbPill{
+    .top-row{
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      gap: 10px;
+      pointer-events: none;
+    }
+
+    /* Toggle container */
+    .sb-toggle{
+      pointer-events: auto;
       display:flex;
       align-items:center;
       gap:10px;
       padding:10px 14px;
       border-radius:999px;
       background:rgba(0,0,0,0.45);
-      border:1px solid rgba(255,255,255,0.14);
-      backdrop-filter: blur(10px);
-      box-shadow:0 10px 30px rgba(0,0,0,0.55);
+      border:1px solid rgba(255,255,255,0.12);
+      backdrop-filter: blur(12px);
+      box-shadow:0 12px 40px rgba(0,0,0,0.55);
       user-select:none;
     }
-    .sbLabel{
+    .sb-label{
       font-size:12px;
       letter-spacing:0.18em;
       text-transform:uppercase;
-      color:rgba(255,255,255,0.85);
-      white-space:nowrap;
+      color: rgba(255,255,255,0.92);
+      white-space: nowrap;
     }
 
-    .switch{
-      position:relative;
-      width:56px;
-      height:30px;
-      border-radius:999px;
-      background:rgba(255,255,255,0.18);
-      border:1px solid rgba(255,255,255,0.18);
-      cursor:pointer;
-      flex:0 0 auto;
+    .sb-toggle input{ display:none; }
+
+    .slider{
+      width: 48px;
+      height: 26px;
+      background: rgba(255,255,255,0.25);
+      border-radius: 999px;
+      position: relative;
+      transition: background 180ms ease;
+      border:1px solid rgba(255,255,255,0.14);
     }
-    .knob{
+    .slider::after{
+      content:"";
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: #fff;
       position:absolute;
-      top:3px;
-      left:3px;
-      width:24px;
-      height:24px;
-      border-radius:50%;
-      background:#fff;
-      transition:transform .18s ease;
-    }
-    .switch.on .knob{
-      transform:translateX(26px);
+      top: 2px;
+      left: 3px;
+      transition: transform 180ms ease;
+      box-shadow: 0 8px 18px rgba(0,0,0,0.45);
     }
 
-    /* Admin link pill */
-    .adminLink{
+    /* ✅ GREEN when ON */
+    .sb-toggle input:checked + .slider{
+      background: rgba(46,204,113,0.95);
+      border-color: rgba(46,204,113,0.85);
+    }
+    .sb-toggle input:checked + .slider::after{
+      transform: translateX(21px);
+    }
+
+    /* Admin button */
+    .adminBtn{
+      pointer-events: auto;
       font-size:12px;
       letter-spacing:0.18em;
       text-transform:uppercase;
-      padding:10px 14px;
+      padding:10px 16px;
       border-radius:999px;
       background:rgba(0,0,0,0.45);
-      border:1px solid rgba(255,255,255,0.14);
-      backdrop-filter: blur(10px);
-      box-shadow:0 10px 30px rgba(0,0,0,0.55);
-      color:rgba(255,255,255,0.9);
+      border:1px solid rgba(255,255,255,0.12);
+      backdrop-filter: blur(12px);
+      box-shadow:0 12px 40px rgba(0,0,0,0.55);
+      color:rgba(255,255,255,0.92);
       text-decoration:none;
       user-select:none;
-      white-space:nowrap;
+      white-space: nowrap;
     }
-    .adminLink:hover{ background:rgba(0,0,0,0.6); }
-    .adminLink:active{ transform: translateY(1px); }
+    .adminBtn:active{ transform: translateY(1px); }
 
-    /* =========================
-       ✅ Title moved to SECOND ROW (centered, never overlaps)
-       ========================= */
-    .topTitle{
-      position:absolute;
-      top: calc(60px + env(safe-area-inset-top)); /* second row */
-      left:50%;
-      transform:translateX(-50%);
-      z-index:110;
+    /* Title row */
+    .title-row{
+      margin-top: 10px; /* ✅ puts title one row below */
+      display:flex;
+      justify-content:center;
+      pointer-events:none;
+    }
+    .gameTitle{
       font-weight:900;
       letter-spacing:0.22em;
       text-transform:uppercase;
       font-size:14px;
       padding:10px 18px;
       border-radius:999px;
-      background:rgba(0,0,0,0.65);
-      backdrop-filter:blur(10px);
-      box-shadow:0 12px 40px rgba(0,0,0,0.6);
-      pointer-events:none;
+      background:rgba(0,0,0,0.55);
+      border:1px solid rgba(255,255,255,0.10);
+      backdrop-filter:blur(12px);
+      box-shadow:0 12px 40px rgba(0,0,0,0.55);
       white-space:nowrap;
-      max-width: 86vw;             /* prevent clipping */
+      max-width: 86vw;
       overflow:hidden;
-      text-overflow:ellipsis;      /* nice fallback on tiny screens */
+      text-overflow: ellipsis;
     }
 
+    /* Main image */
     #image{
       max-width:100vw;
       max-height:100vh;
@@ -239,6 +255,7 @@
 
     .disabled{ opacity:.35; pointer-events:none; }
 
+    /* Touchdown flash */
     .flash{
       position:absolute;
       inset:0;
@@ -285,20 +302,22 @@
 <body>
   <div class="stage">
 
-    <!-- ✅ Top row -->
-    <div class="topControls">
-      <div class="sbPill" id="sbPill">
-        <div class="sbLabel">Superbowl</div>
-        <div class="switch" id="sbSwitch" role="switch" aria-checked="false">
-          <div class="knob"></div>
-        </div>
+    <!-- ✅ NEW: Top HUD -->
+    <div class="top-hud">
+      <div class="top-row">
+        <label class="sb-toggle">
+          <span class="sb-label">SUPERBOWL</span>
+          <input type="checkbox" id="sbToggle" />
+          <span class="slider"></span>
+        </label>
+
+        <a class="adminBtn" href="/admin.html">ADMIN</a>
       </div>
 
-      <a class="adminLink" href="/admin.html">ADMIN</a>
+      <div class="title-row">
+        <div class="gameTitle">ENDZONE MADNESS</div>
+      </div>
     </div>
-
-    <!-- ✅ Second row title -->
-    <div class="topTitle">Endzone Madness</div>
 
     <img id="image" alt="">
     <div class="veil"></div>
@@ -318,12 +337,15 @@
   </div>
 
   <div id="tdFlash"></div>
+
+  <!-- Crowd sound -->
   <audio id="tdAudio" preload="auto" src="/sounds/td-crowd.mp3"></audio>
 
   <script>
     const SPIN_SPEED_MS = 90;
     const QB_SPIN_MS = 5400;
     const RECEIVER_SPIN_MS = 5400;
+
     const TD_FLASH_MS = 2200;
 
     const img = document.getElementById("image");
@@ -336,27 +358,11 @@
     const btnQB = document.getElementById("btnQB");
     const btnReceiver = document.getElementById("btnReceiver");
 
-    // ✅ SB toggle UI + state (stored)
-    const sbSwitch = document.getElementById("sbSwitch");
-    let sbMode = localStorage.getItem("SB_MODE") === "1";
-
-    function paintSB(){
-      sbSwitch.classList.toggle("on", sbMode);
-      sbSwitch.setAttribute("aria-checked", sbMode ? "true" : "false");
-    }
-    paintSB();
-
-    function toggleSB(){
-      sbMode = !sbMode;
-      localStorage.setItem("SB_MODE", sbMode ? "1" : "0");
-      paintSB();
-    }
-    sbSwitch.addEventListener("click", toggleSB);
-    // Allow tapping the whole pill
-    document.getElementById("sbPill").addEventListener("click", (e) => {
-      // avoid double toggle if click hit the switch itself
-      if (e.target === sbSwitch || sbSwitch.contains(e.target)) return;
-      toggleSB();
+    // ✅ Superbowl toggle (UI only + used for receiver mode)
+    const sbToggle = document.getElementById("sbToggle");
+    sbToggle.checked = localStorage.getItem("sbMode") === "on";
+    sbToggle.addEventListener("change", () => {
+      localStorage.setItem("sbMode", sbToggle.checked ? "on" : "off");
     });
 
     let spinning = false, spinInterval = null;
@@ -373,6 +379,7 @@
       btnReceiver.classList.toggle("disabled", d);
     }
 
+    // Unlock audio silently
     let audioUnlocked = false;
     function unlockAudioOnce(){
       if (audioUnlocked) return;
@@ -433,11 +440,13 @@
       if(spinning) return;
       spinning = true;
       setButtonsDisabled(true);
+
       unlockAudioOnce();
 
       img.style.display = "block";
       spinLabel.textContent = type==="QB" ? "QB PASSING…" : "CATCHING…";
       spinLabel.style.display = "block";
+
       bottomPill.style.visibility = "hidden";
 
       const duration = type==="QB" ? QB_SPIN_MS : RECEIVER_SPIN_MS;
@@ -460,9 +469,9 @@
             const p = await fetchJSON("/api/random-player");
             bottomPill.innerHTML = `PASS TO: <span class="gold">${p.name}</span>`;
           }else{
-            // ✅ SB mode affects receiver only
-            const modeParam = sbMode ? "sb" : "normal";
-            const c = await fetchJSON(`/api/random-catch?mode=${modeParam}`);
+            // ✅ Superbowl mode uses column "final" on backend via mode=sb
+            const mode = sbToggle.checked ? "sb" : "normal";
+            const c = await fetchJSON(`/api/random-catch?mode=${mode}`);
             bottomPill.innerHTML = `CATCH: <span class="gold">${c.catch}</span>`;
             if(String(c.catch).toUpperCase().includes("TOUCHDOWN")) playTD();
           }
@@ -480,6 +489,7 @@
     btnQB.onclick = () => spin("QB");
     btnReceiver.onclick = () => spin("Receiver");
 
+    // Initial image on load
     (async()=>{
       try{
         const d = await fetchJSON("/api/random-image?type=QB");
