@@ -1,7 +1,7 @@
 const express = require("express");
 const path = require("path");
 const fs = require("fs");
-//const fetch = require("node-fetch");
+const fetch = require("node-fetch");
 const csv = require("csv-parser");
 const { Readable } = require("stream");
 const { google } = require("googleapis");
@@ -19,7 +19,7 @@ function mustEnv(name) {
 }
 
 function getServiceAccountJSON() {
-  // Support either raw JSON env var OR base64 env var (you used B64 earlier)
+  // Support either raw JSON env var OR base64 env var
   const raw = process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
   const b64 = process.env.GOOGLE_SERVICE_ACCOUNT_JSON_B64;
 
@@ -30,7 +30,9 @@ function getServiceAccountJSON() {
     return JSON.parse(decoded);
   }
 
-  throw new Error("Missing env var: GOOGLE_SERVICE_ACCOUNT_JSON or GOOGLE_SERVICE_ACCOUNT_JSON_B64");
+  throw new Error(
+    "Missing env var: GOOGLE_SERVICE_ACCOUNT_JSON or GOOGLE_SERVICE_ACCOUNT_JSON_B64"
+  );
 }
 
 const PLAYERS_SHEET_ID = mustEnv("PLAYERS_SHEET_ID");
@@ -55,7 +57,9 @@ app.get("/api/random-image", (req, res) => {
 
   let files;
   try {
-    files = fs.readdirSync(folder).filter(f => /\.(png|jpg|jpeg|webp)$/i.test(f));
+    files = fs
+      .readdirSync(folder)
+      .filter((f) => /\.(png|jpg|jpeg|webp)$/i.test(f));
   } catch {
     return res.status(500).json({ error: "Image folder not found" });
   }
@@ -63,7 +67,9 @@ app.get("/api/random-image", (req, res) => {
   if (!files.length) return res.status(500).json({ error: "No images found" });
 
   const pick = files[Math.floor(Math.random() * files.length)];
-  res.json({ url: `/images/${type === "receiver" ? "Receiver" : "QB"}/${pick}` });
+  res.json({
+    url: `/images/${type === "receiver" ? "Receiver" : "QB"}/${pick}`,
+  });
 });
 
 /* =========================
@@ -80,7 +86,7 @@ async function readCSV(url, column) {
   return new Promise((resolve, reject) => {
     Readable.from(text)
       .pipe(csv())
-      .on("data", row => {
+      .on("data", (row) => {
         if (row[column]) values.push(String(row[column]).trim());
       })
       .on("end", () => resolve(values))
@@ -100,11 +106,14 @@ app.get("/api/random-catch", async (req, res) => {
       results = await readCSV(RECEIVERS_SHEET_URL, "catch");
     }
 
-    if (!results.length) return res.status(500).json({ error: "No catches found" });
+    if (!results.length)
+      return res.status(500).json({ error: "No catches found" });
 
     res.json({ catch: results[Math.floor(Math.random() * results.length)] });
   } catch (err) {
-    res.status(500).json({ error: "Failed to read receivers sheet", details: err.message });
+    res
+      .status(500)
+      .json({ error: "Failed to read receivers sheet", details: err.message });
   }
 });
 
@@ -126,8 +135,7 @@ async function getSheetsClient() {
 }
 
 function a1Range(tabName) {
-  // Column A = "name"
-  return `${tabName}!A:A`;
+  return `${tabName}!A:A`; // Column A = "name"
 }
 
 async function readPlayersFromSheet() {
@@ -139,10 +147,11 @@ async function readPlayersFromSheet() {
   });
 
   const rows = resp.data.values || [];
+
   // Expect header in first row, names below
   const names = rows
     .slice(1)
-    .map(r => (r[0] || "").trim())
+    .map((r) => (r[0] || "").trim())
     .filter(Boolean);
 
   // Make unique while keeping order
@@ -158,11 +167,22 @@ async function readPlayersFromSheet() {
   return unique;
 }
 
+/* ✅ FIX HERE:
+   When we delete someone, the new list can be shorter.
+   Google Sheets UPDATE does NOT clear leftover old rows.
+   So we CLEAR the column first, then write the new list.
+*/
 async function writePlayersToSheet(players) {
   const sheets = await getSheetsClient();
 
-  // Rewrite entire column A: header + list
-  const values = [["name"], ...players.map(n => [n])];
+  // 1) Clear column A fully (removes leftovers from previous longer list)
+  await sheets.spreadsheets.values.clear({
+    spreadsheetId: PLAYERS_SHEET_ID,
+    range: `${PLAYERS_TAB_NAME}!A:A`,
+  });
+
+  // 2) Write header + list back from the top
+  const values = [["name"], ...players.map((n) => [n])];
 
   await sheets.spreadsheets.values.update({
     spreadsheetId: PLAYERS_SHEET_ID,
@@ -176,11 +196,14 @@ async function writePlayersToSheet(players) {
 app.get("/api/random-player", async (req, res) => {
   try {
     const players = await readPlayersFromSheet();
-    if (!players.length) return res.status(500).json({ error: "No players found" });
+    if (!players.length)
+      return res.status(500).json({ error: "No players found" });
 
     res.json({ name: players[Math.floor(Math.random() * players.length)] });
   } catch (err) {
-    res.status(500).json({ error: "Failed to read players sheet", details: err.message });
+    res
+      .status(500)
+      .json({ error: "Failed to read players sheet", details: err.message });
   }
 });
 
@@ -202,7 +225,7 @@ app.post("/api/admin/receiver-players", async (req, res) => {
     const players = await readPlayersFromSheet();
 
     // prevent duplicates
-    const exists = players.some(p => p.toLowerCase() === name.toLowerCase());
+    const exists = players.some((p) => p.toLowerCase() === name.toLowerCase());
     if (!exists) players.push(name);
 
     await writePlayersToSheet(players);
@@ -219,7 +242,7 @@ app.delete("/api/admin/receiver-players", async (req, res) => {
     if (!name) return res.status(400).json({ error: "Missing name" });
 
     const players = await readPlayersFromSheet();
-    const filtered = players.filter(p => p.toLowerCase() !== name.toLowerCase());
+    const filtered = players.filter((p) => p.toLowerCase() !== name.toLowerCase());
 
     await writePlayersToSheet(filtered);
 
